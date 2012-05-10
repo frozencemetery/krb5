@@ -59,7 +59,8 @@
 #endif
 
 /* Local functions */
-static void addConfigEntry(const char *oidStr, const char *oid, const char *sharedLib, const char *kernMod, const char *modOptions);
+static void addConfigEntry(const char *oidStr, const char *oid, const char *sharedLib,
+			    const char *kernMod, const char *modOptions, const char *modType);
 static gss_mech_info searchMechList(gss_const_OID);
 static void loadConfigFile(const char *);
 #if defined(_WIN32)
@@ -912,6 +913,7 @@ const char *fileName;
 	char *sharedLib, *kernMod, *modOptions, *oid, *endp;
 	char buffer[BUFSIZ], *oidStr;
 	FILE *confFile;
+	char *modType = NULL;
 
 	if ((confFile = fopen(fileName, "r")) == NULL) {
 		return;
@@ -980,8 +982,10 @@ const char *fileName;
 		 * If this item starts with a bracket "[", then
 		 * it is not a kernel module, but is a list of
 		 * options for the user module to parse later.
+		 * If it starts with "<" it is also not a kernel
+		 * module but a plugin type indicator.
 		 */
-		if (*kernMod && *kernMod != '[') {
+		if (*kernMod && *kernMod != '[' && *kernMod != '<') {
 			/*
 			 * Find the end of the shared lib name and make sure
 			 * it is NULL-terminated.
@@ -1010,12 +1014,29 @@ const char *fileName;
 			for (endp = modOptions;
 			     *endp && *endp != ']'; endp++);
 
-			*endp = '\0';
+			/* see if we have a modType past "]" */
+			if (*endp == ']') {
+			    *endp = '\0';
+			    for (++endp; *endp && *endp != '<'; endp++);
+			    if (*endp == '<') {
+				modType = endp;
+			    }
+			}
 		} else {
+			if (*modOptions == '<') {
+			    modType = modOptions;
+			}
 			modOptions = NULL;
 		}
 
-		addConfigEntry(oidStr, oid, sharedLib, kernMod, modOptions);
+		if (modType && *modType == '<') {
+		    for (++modType, endp = modType;
+			 *endp && *endp != '>'; endp++);
+		    *endp = '\0';
+		}
+
+		addConfigEntry(oidStr, oid, sharedLib,
+				kernMod, modOptions, modType);
 	} /* while */
 	(void) fclose(confFile);
 } /* loadConfigFile */
@@ -1112,8 +1133,10 @@ loadConfigFromRegistry(HKEY hBaseKey, const char *keyPath)
 	DWORD iSubKey, nSubKeys, maxSubKeyNameLen;
 	char *oidStr = NULL, *oid = NULL, *sharedLib = NULL, *kernMod = NULL;
 	char *modOptions = NULL;
+	char *modType = NULL;
 	DWORD oidStrLen = 0, oidLen = 0, sharedLibLen = 0, kernModLen = 0;
 	DWORD modOptionsLen = 0;
+	DWORD modTypeLen = 0;
 	HRESULT rc;
 
 	if ((rc = RegOpenKeyEx(hBaseKey, keyPath, 0,
@@ -1156,7 +1179,10 @@ loadConfigFromRegistry(HKEY hBaseKey, const char *keyPath)
 			       &kernModLen);
 		getRegKeyValue(hConfigKey, oidStr, "Options", &modOptions,
 			       &modOptionsLen);
-		addConfigEntry(oidStr, oid, sharedLib, kernMod, modOptions);
+		getRegKeyValue(hConfigKey, oidStr, "Type", &modType,
+			       &modTypeLen);
+		addConfigEntry(oidStr, oid, sharedLib,
+				kernMod, modOptions, modType);
 	}
 cleanup:
 	RegCloseKey(hConfigKey);
@@ -1180,7 +1206,7 @@ cleanup:
 
 static void
 addConfigEntry(const char *oidStr, const char *oid, const char *sharedLib,
-	       const char *kernMod, const char *modOptions)
+	       const char *kernMod, const char *modOptions, const char *modType)
 {
 #if defined(_WIN32)
 	const char *sharedPath;
@@ -1296,6 +1322,10 @@ addConfigEntry(const char *oidStr, const char *oid, const char *sharedLib,
 
 	if (modOptions)
 		aMech->optionStr = strdup(modOptions);
+
+
+	if (modType && strcmp(modType, "interposer") == 0)
+		aMech->is_interposer = 1;
 	/*
 	 * add the new entry to the end of the list - make sure
 	 * that only complete entries are added because other

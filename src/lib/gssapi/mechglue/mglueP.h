@@ -667,6 +667,8 @@ typedef struct gss_mech_config {
 	gss_mechanism mech;		/* mechanism initialization struct */
  	int priority;			/* mechanism preference order */
 	int freeMech;			/* free mech table */
+	int is_interposer; /* if set to 1 it means this is an interposer */
+	gss_OID int_mech_type;	  /* points to the interposer OID */
 	struct gss_mech_config *next;	/* next element in the list */
 } *gss_mech_info;
 
