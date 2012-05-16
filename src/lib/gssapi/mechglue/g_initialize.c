@@ -53,6 +53,7 @@
 #endif
 
 #define MECH_SYM "gss_mech_initialize"
+#define MECH_INTERPOSER_SYM "gss_mech_interposer"
 
 #ifndef MECH_CONF
 #define	MECH_CONF "/etc/gss/mech"
@@ -72,11 +73,14 @@ static time_t getRegConfigModTime(const char *keyPath);
 static void getRegKeyValue(HKEY key, const char *keyPath, const char *valueName, void **data, DWORD *dataLen);
 static void loadConfigFromRegistry(HKEY keyBase, const char *keyPath);
 #endif
+static void initMechList(void);
 static void updateMechList(void);
 static void freeMechList(void);
 
 static OM_uint32 build_mechSet(void);
 static void free_mechSet(void);
+
+static void loadInterMech(gss_mech_info aMech);
 
 /*
  * list of mechanism libraries and their entry points.
@@ -112,6 +116,10 @@ gssint_mechglue_init(void)
 	err = gss_krb5int_lib_init();
 	err = gss_spnegoint_lib_init();
 #endif
+
+	/* read conf file at least once so that interposer
+	 * plugins have a chance of getting initialized */
+	initMechList();
 
 	err = gssint_mecherrmap_init();
 	return err;
@@ -530,12 +538,14 @@ gssint_get_mechanisms(char *mechArray[], int arrayLen)
 static void
 updateMechList(void)
 {
+	int updated = 0;
 #if defined(_WIN32)
 	time_t lastConfModTime = getRegConfigModTime(MECH_KEY);
 	if (g_confFileModTime < lastConfModTime) {
 		g_confFileModTime = lastConfModTime;
 		loadConfigFromRegistry(HKEY_CURRENT_USER, MECH_KEY);
 		loadConfigFromRegistry(HKEY_LOCAL_MACHINE, MECH_KEY);
+		updated = 1;
 	}
 #else /* _WIN32 */
 	char *fileName;
@@ -548,12 +558,39 @@ updateMechList(void)
 		(fileInfo.st_mtime > g_confFileModTime)) {
 		loadConfigFile(fileName);
 		g_confFileModTime = fileInfo.st_mtime;
+		updated = 1;
 	}
 #if 0
 	init_hardcoded();
 #endif
 #endif /* !_WIN32 */
+
+	/* Now check if there is any new interposer mechanism,
+	 * we need to initialize them before anything else is called
+	 * in order to know which mechanism to interpose */
+	if (updated == 1) {
+		gss_mech_info aMech = g_mechList;
+		while (aMech != NULL) {
+			if (aMech->is_interposer &&
+			    aMech->mech == NULL) {
+				loadInterMech(aMech);
+			}
+			aMech = aMech->next;
+		}
+	}
+
 } /* updateMechList */
+
+static void
+initMechList(void)
+{
+	if (k5_mutex_lock(&g_mechListLock) != 0)
+		return;
+
+	updateMechList();
+
+	(void)k5_mutex_unlock(&g_mechListLock);
+}
 
 static void
 releaseMechInfo(gss_mech_info *pCf)
@@ -584,6 +621,8 @@ releaseMechInfo(gss_mech_info *pCf)
 	}
 	if (cf->dl_handle != NULL)
 		krb5int_close_plugin(cf->dl_handle);
+	if (cf->int_mech_type != GSS_C_NO_OID)
+		generic_gss_release_oid(&minor_status, &cf->int_mech_type);
 
 	memset(cf, 0, sizeof(*cf));
 	free(cf);
@@ -778,6 +817,247 @@ build_dynamicMech(void *dl, const gss_OID mech_type)
 	mech->mech_type = *(mech_type);
 
 	return mech;
+}
+
+#define RESOLVE_GSSI_SYMBOL(_dl, _mech, _psym, _nsym) \
+	do { \
+		struct errinfo errinfo; \
+		\
+		memset(&errinfo, 0, sizeof(errinfo)); \
+		if (krb5int_get_plugin_func(_dl, \
+					    "gssi" #_nsym, \
+					    (void (**)())&(_mech)->_psym ## _nsym, \
+					    &errinfo) || errinfo.code) \
+			(_mech)->_psym ## _nsym = NULL; \
+	} while (0)
+
+static int build_interMech(void *dl, gss_mech_info aMech)
+{
+	gss_mechanism mech;
+
+	mech = (gss_mechanism)calloc(1, sizeof(*mech));
+	if (mech == NULL) {
+		return ENOMEM;
+	}
+
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _acquire_cred);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _release_cred);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _init_sec_context);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _accept_sec_context);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _process_context_token);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _delete_sec_context);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _context_time);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _get_mic);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _verify_mic);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _wrap);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _unwrap);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _display_status);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _indicate_mechs);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _compare_name);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _display_name);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _import_name);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _release_name);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _inquire_cred);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _add_cred);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _export_sec_context);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _import_sec_context);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _inquire_cred_by_mech);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _inquire_names_for_mech);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _inquire_context);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _internal_release_oid);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _wrap_size_limit);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _localname);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gssspi, _authorize_localname);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _export_name);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _duplicate_name);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _store_cred);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _inquire_sec_context_by_oid);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _inquire_cred_by_oid);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _set_sec_context_option);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gssspi, _set_cred_option);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gssspi, _mech_invoke);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _wrap_aead);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _unwrap_aead);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _wrap_iov);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _unwrap_iov);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _wrap_iov_length);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _complete_auth_token);
+	/* Services4User (introduced in 1.8) */
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _acquire_cred_impersonate_name);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _add_cred_impersonate_name);
+	/* Naming extensions (introduced in 1.8) */
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _display_name_ext);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _inquire_name);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _get_name_attribute);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _set_name_attribute);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _delete_name_attribute);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _export_name_composite);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _map_name_to_any);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _release_any_name_mapping);
+	/* RFC 4401 (introduced in 1.8) */
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _pseudo_random);
+	/* RFC 4178 (introduced in 1.8; get_neg_mechs not implemented) */
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _set_neg_mechs);
+	/* draft-ietf-sasl-gs2 */
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _inquire_saslname_for_mech);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _inquire_mech_for_saslname);
+	/* RFC 5587 */
+	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _inquire_attrs_for_mech);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gssspi, _acquire_cred_with_password);
+
+	mech->mech_type = *aMech->mech_type;
+        aMech->mech = mech;
+
+	return 0;
+}
+
+static void
+loadInterMech(gss_mech_info aMech)
+{
+	struct plugin_file_handle *dl;
+	struct errinfo errinfo;
+	gss_OID_set (*isym)(const gss_OID);
+	gss_OID_set list;
+	OM_uint32 min;
+	gss_mech_info iMech;
+	gss_mech_info rMech;
+	gss_OID_desc tmp;
+	char buf[512]; /* hopefully enough */
+	size_t i;
+
+	memset(&errinfo, 0, sizeof(errinfo));
+
+	if (krb5int_open_plugin(aMech->uLibName, &dl, &errinfo) != 0 ||
+	    errinfo.code != 0) {
+#if 0
+		(void) syslog(LOG_INFO, "libgss dlopen(%s): %s\n",
+				aMech->uLibName, dlerror());
+#endif
+		return;
+	}
+
+	if (krb5int_get_plugin_func(dl, MECH_INTERPOSER_SYM,
+				(void (**)())&isym, &errinfo) == 0) {
+		/* This is an interposer plugin, get list of mechs
+		 * to interpose */
+		/* NOTE: the list must point to static buffers, as they will
+		 * be referenced throught the life of the library */
+		list = (*isym)(aMech->mech_type);
+		if (!list) {
+			/* couldn't get list of mechs to interpose,
+			 * can't really do anything else here */
+			(void)krb5int_close_plugin(dl);
+			return;
+		}
+		if (build_interMech(dl, aMech)) {
+			/* couldn't get list of mechs to interpose,
+			 * can't really do anything else here */
+			(void)krb5int_close_plugin(dl);
+			(void)gss_release_oid_set(&min, &list);
+			return;
+		}
+		aMech->freeMech = 1;
+
+		/* create shadow mechs for each intercepted in the list. */
+		for (i = 0; i < list->count; i++) {
+			iMech = calloc(1, sizeof(struct gss_mech_config));
+			if (iMech == NULL) {
+				continue;
+			}
+
+			iMech->is_interposer = 1;
+			iMech->mech = aMech->mech;
+
+			/* here is the trick, we build a special oid that is
+			 * the sum of the interposer oid and the real mech
+			 * oid. This is used to lookup the right mech within
+			 * the mechglue. */
+			tmp.elements = (void *)buf;
+			tmp.length = aMech->mech_type->length;
+			if (tmp.length > 512) {
+				releaseMechInfo(&iMech);
+				continue;
+			}
+			memcpy(buf, aMech->mech_type->elements,
+				    aMech->mech_type->length);
+			tmp.length += list->elements[i].length;
+			if (tmp.length > 512) {
+				releaseMechInfo(&iMech);
+				continue;
+			}
+			memcpy(&buf[aMech->mech_type->length],
+				list->elements[i].elements,
+				list->elements[i].length);
+			if (generic_gss_copy_oid(&min, &tmp,
+					&iMech->mech_type) != GSS_S_COMPLETE) {
+				releaseMechInfo(&iMech);
+				continue;
+			}
+
+			/* we use the int_mech_type as a reference to the real
+			 * mechanism */
+                        if (generic_gss_copy_oid(&min, &list->elements[i],
+                                    &iMech->int_mech_type) != GSS_S_COMPLETE) {
+				releaseMechInfo(&iMech);
+				continue;
+			}
+
+			if (aMech->kmodName) {
+				iMech->kmodName = strdup(aMech->kmodName);
+				if (iMech->kmodName == NULL) {
+					releaseMechInfo(&iMech);
+					continue;
+				}
+			}
+			if (aMech->uLibName) {
+				iMech->uLibName = strdup(aMech->uLibName);
+				if (iMech->uLibName == NULL) {
+					releaseMechInfo(&iMech);
+					continue;
+				}
+			}
+			if (aMech->mechNameStr) {
+				iMech->mechNameStr = strdup(aMech->mechNameStr);
+				if (iMech->mechNameStr == NULL) {
+					releaseMechInfo(&iMech);
+					continue;
+				}
+			}
+			if (aMech->optionStr) {
+				iMech->optionStr = strdup(aMech->optionStr);
+				if (iMech->optionStr == NULL) {
+					releaseMechInfo(&iMech);
+					continue;
+				}
+			}
+			/* always append to the end */
+			g_mechListTail->next = iMech;
+			g_mechListTail = iMech;
+
+			/* now set the interposer mech_type on the mechanism it
+			 * wants to intercept */
+			rMech = searchMechList(&list->elements[i]);
+			if (rMech != NULL &&
+			    rMech->int_mech_type == NULL &&
+                            generic_gss_copy_oid(&min, iMech->mech_type,
+                                    &rMech->int_mech_type) != GSS_S_COMPLETE) {
+				releaseMechInfo(&iMech);
+				continue;
+			}
+		}
+		(void)gss_release_oid_set(&min, &list);
+	}
+
+	if (aMech->mech == NULL) {
+		(void) krb5int_close_plugin(dl);
+#if 0
+		(void) syslog(LOG_INFO, "unable to initialize mechanism"
+				" library [%s]\n", aMech->uLibName);
+#endif
+		return;
+	}
+
+	aMech->dl_handle = dl;
 }
 
 static void
