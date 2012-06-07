@@ -348,10 +348,14 @@ build_mechSet(void)
 			      count * sizeof (gss_OID_desc));
 
 		/* now copy each oid element */
-		g_mechSet.count = count;
 		count = 0;
 		mList = g_mechList;
 		while (mList != NULL) {
+			if (mList->is_interposer) {
+				/* skip interposers, we never expose them */
+				mList = mList->next;
+				continue;
+			}
 			curItem = &(g_mechSet.elements[count]);
 			curItem->elements = (void*)
 				malloc(mList->mech_type->length);
@@ -375,6 +379,7 @@ build_mechSet(void)
 			count++;
 			mList = mList->next;
 		}
+		g_mechSet.count = count;
 	}
 
 #if 0
@@ -452,7 +457,7 @@ gssint_mech_to_oid(const char *mechStr, gss_OID* oid)
 
 	/* no lock required - only looking at fields that are not updated */
 	while (aMech != NULL) {
-		if ((aMech->mechNameStr) &&
+		if ((aMech->mechNameStr) && (!aMech->is_interposer) &&
 			strcmp(aMech->mechNameStr, mechStr) == 0) {
 			*oid = aMech->mech_type;
 			return (GSS_S_COMPLETE);
@@ -519,7 +524,7 @@ gssint_get_mechanisms(char *mechArray[], int arrayLen)
 
 	/* no lock required - only looking at fields that are not updated */
 	for (i = 1; i < arrayLen; i++) {
-		if (aMech != NULL) {
+		if (aMech != NULL && !aMech->is_interposer) {
 			*mechArray = aMech->mechNameStr;
 			mechArray++;
 			aMech = aMech->next;
