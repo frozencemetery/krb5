@@ -1076,6 +1076,60 @@ freeMechList(void)
 	}
 }
 
+/* This function will select the proper mechanism OID to return based on the
+ * input oid. It can return either a real machanism oid or a special interposer
+ * oid.
+ * NOTE: the returned oid is statically preallocated and must not be freed */
+OM_uint32 gssint_select_mech_type(OM_uint32 *minor, gss_const_OID oid,
+				  gss_OID *selected_oid)
+{
+	gss_mech_info aMech;
+	OM_uint32 status = GSS_S_BAD_MECH;
+
+	if (gssint_mechglue_initialize_library() != 0)
+		return GSS_S_FAILURE;
+
+	if (k5_mutex_lock(&g_mechListLock) != 0)
+		return GSS_S_FAILURE;
+
+	aMech = g_mechList;
+
+	if (oid == GSS_C_NULL_OID) {
+            oid = aMech->mech_type;
+	}
+
+	while (aMech != NULL) {
+	    /* for interposer mechanisms check for a matching prefix too, to
+	     * handle special oids sent by an interposer plugin */
+	    if (g_OID_equal(aMech->mech_type, oid)) {
+		if (aMech->int_mech_type != GSS_C_NO_OID)
+		    *selected_oid = aMech->int_mech_type;
+		else
+		    *selected_oid = aMech->mech_type;
+		status = GSS_S_COMPLETE;
+		goto done;
+	    } else if (!aMech->is_interposer) {
+		int len;
+		/* check if this is a special oid where the last part matches
+		 * the real mechanism, if so then return the real mech oid */
+		len = oid->length - aMech->mech_type->length;
+		if (len > 0 &&
+		    memcmp(oid->elements + len,
+			    aMech->mech_type->elements,
+			    aMech->mech_type->length) == 0) {
+		    *selected_oid = aMech->mech_type;
+		    status = GSS_S_COMPLETE;
+		    goto done;
+		}
+	    }
+	    aMech = aMech->next;
+	}
+
+done:
+	(void)k5_mutex_unlock(&g_mechListLock);
+	return status;
+}
+
 /*
  * Register a mechanism.  Called with g_mechListLock held.
  */
