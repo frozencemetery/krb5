@@ -1130,6 +1130,28 @@ done:
 	return status;
 }
 
+gss_OID gssint_get_public_oid(gss_const_OID internal_oid)
+{
+	gss_mech_info aMech;
+	gss_OID public_oid = GSS_C_NO_OID;
+
+	if (gssint_mechglue_initialize_library() != 0)
+		return GSS_C_NO_OID;
+
+	if (k5_mutex_lock(&g_mechListLock) != 0)
+		return GSS_C_NO_OID;
+
+	if ((aMech = searchMechList(internal_oid)) != NULL) {
+		if (aMech->is_interposer)
+			public_oid = aMech->int_mech_type;
+		else
+			public_oid = aMech->mech_type;
+	}
+
+	(void)k5_mutex_unlock(&g_mechListLock);
+	return public_oid;
+}
+
 /*
  * Register a mechanism.  Called with g_mechListLock held.
  */
