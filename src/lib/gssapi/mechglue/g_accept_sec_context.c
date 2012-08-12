@@ -156,10 +156,29 @@ gss_cred_id_t *		d_cred;
 	if (status)
 	    return status;
 
-	status = gssint_select_mech_type(minor_status, token_mech_type,
-					 &selected_mech);
-	if (status)
-	    return status;
+        /* if the verifier contains creds, it may be an interposer plugin
+         * calling back into the mechglue layer, so use the mechanism for
+         * which we have matching creds for if available */
+        if (verifier_cred_handle != GSS_C_NO_CREDENTIAL) {
+            gss_union_cred_t uc;
+            int i;
+
+            uc = (gss_union_cred_t)verifier_cred_handle;
+            for (i = 0; i < uc->count; i++) {
+	        if (g_OID_equal(token_mech_type,
+                                gssint_get_public_oid(&uc->mechs_array[i]))) {
+                    selected_mech = &uc->mechs_array[i];
+                    break;
+                }
+            }
+        }
+
+        if (selected_mech == GSS_C_NO_OID) {
+	    status = gssint_select_mech_type(minor_status, token_mech_type,
+					     &selected_mech);
+	    if (status)
+	        return status;
+        }
 
     } else {
 	union_ctx_id = (gss_union_ctx_id_t)*context_handle;
