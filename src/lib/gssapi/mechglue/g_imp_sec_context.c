@@ -144,13 +144,19 @@ gss_ctx_id_t *		context_handle;
 	status = GSS_S_BAD_MECH;
 	goto error_out;
     }
-    if (!mech->gss_import_sec_context) {
+    if (!mech->gssspi_import_sec_context_for_mech &&
+        !mech->gss_import_sec_context) {
 	status = GSS_S_UNAVAILABLE;
 	goto error_out;
     }
 
-    status = mech->gss_import_sec_context(minor_status,
-					  &token, &ctx->internal_ctx_id);
+    if (mech->gssspi_import_sec_context_for_mech)
+	status = mech->gssspi_import_sec_context_for_mech(minor_status,
+				    gssint_get_public_oid(selected_mech),
+				    &token, &ctx->internal_ctx_id);
+    else
+	status = mech->gss_import_sec_context(minor_status,
+					      &token, &ctx->internal_ctx_id);
 
     if (status == GSS_S_COMPLETE) {
 	ctx->loopback = ctx;
