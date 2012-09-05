@@ -817,6 +817,7 @@ build_dynamicMech(void *dl, const gss_OID mech_type)
         GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_inquire_attrs_for_mech);
 	GSS_ADD_DYNAMIC_METHOD(dl, mech, gssspi_acquire_cred_with_password);
 	GSS_ADD_DYNAMIC_METHOD(dl, mech, gssspi_import_sec_context_for_mech);
+	GSS_ADD_DYNAMIC_METHOD(dl, mech, gssspi_import_name_by_mech);
 
 	assert(mech_type != GSS_C_NO_OID);
 
@@ -911,6 +912,7 @@ static int build_interMech(void *dl, gss_mech_info aMech)
 	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _inquire_attrs_for_mech);
 	RESOLVE_GSSI_SYMBOL(dl, mech, gssspi, _acquire_cred_with_password);
 	RESOLVE_GSSI_SYMBOL(dl, mech, gssspi, _import_sec_context_for_mech);
+	RESOLVE_GSSI_SYMBOL(dl, mech, gssspi, _import_name_by_mech);
 
 	mech->mech_type = *aMech->mech_type;
         aMech->mech = mech;

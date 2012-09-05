@@ -657,6 +657,15 @@ typedef struct gss_config {
 	    gss_ctx_id_t *		/* context_handle */
 	/* */);
 
+	OM_uint32       (KRB5_CALLCONV *gssspi_import_name_by_mech)
+	(
+	    OM_uint32 *,		/* minor_status */
+	    gss_OID,			/* mech_type */
+	    gss_buffer_t,		/* input_name_buffer */
+	    gss_OID,			/* input_name_type */
+	    gss_name_t*			/* output_name */
+	/* */);
+
 } *gss_mechanism;
 
 /*

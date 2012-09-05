@@ -381,13 +381,20 @@ gss_name_t	*internal_name;
 	}
     }
 
-    if (mech->gss_import_name == NULL)
+    if (mech->gssspi_import_name_by_mech)
+	status = mech->gssspi_import_name_by_mech(minor_status,
+						  gssint_get_public_oid(mech_type),
+						  union_name->external_name,
+						  union_name->name_type,
+						  internal_name);
+    else if (mech->gss_import_name)
+	status = mech->gss_import_name(minor_status,
+				       union_name->external_name,
+				       union_name->name_type,
+				       internal_name);
+    else
 	return (GSS_S_UNAVAILABLE);
 
-    status = mech->gss_import_name(minor_status,
-				   union_name->external_name,
-				   union_name->name_type,
-				   internal_name);
     if (status == GSS_S_COMPLETE) {
         /* Attempt to round-trip attributes */
 	(void) import_internal_attributes(&tmpMinor, mech,
