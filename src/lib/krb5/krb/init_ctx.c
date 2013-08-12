@@ -51,6 +51,7 @@
 
 #include "k5-int.h"
 #include "int-proto.h"
+#include "os-proto.h"
 #include <ctype.h>
 #include "brand.c"
 #include "../krb5_libinit.h"
@@ -289,6 +290,7 @@ krb5_free_context(krb5_context ctx)
 #endif
 
     k5_ccselect_free_context(ctx);
+    k5_localauth_free_context(ctx);
     k5_plugin_free_context(ctx);
     free(ctx->plugin_base_dir);
 
