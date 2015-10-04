@@ -114,7 +114,7 @@ t_cccursor: $(T_CCCURSOR_OBJS) $(KRB5_BASE_DEPLIBS)
 
 check-unix:: t_cc
 	KRB5_CONFIG=$(srcdir)/t_krb5.conf ; export KRB5_CONFIG ;\
-	$(RUN_SETUP) $(VALGRIND) ./t_cc
+	$(RUN_TEST) ./t_cc
 
 check-pytests:: t_cccursor
 	$(RUNPYTEST) $(srcdir)/t_cccol.py $(PYTESTFLAGS)

@@ -7,6 +7,10 @@ DEFS=
 DEFINES=-DLIBDIR=\"$(KRB5_LIBDIR)\"
 LOCALINCLUDES=-I$(top_srcdir)/util/profile
 
+# Like RUN_TEST, but use td_krb5.conf from this directory.
+RUN_TEST_LOCAL_CONF=$(RUN_SETUP) KRB5_CONFIG=$(srcdir)/td_krb5.conf LC_ALL=C \
+	$(VALGRIND)
+
 ##DOS##BUILDTOP = ..\..\..
 ##DOS##PREFIXDIR=os
 ##DOS##OBJFILE=..\$(OUTPRE)$(PREFIXDIR).lst
@@ -202,8 +206,7 @@ lclint-localaddr: localaddr.c
 check-unix:: check-unix-stdconf check-unix-locate
 
 check-unix-stdconf:: t_std_conf
-	KRB5_CONFIG=$(srcdir)/td_krb5.conf ; export KRB5_CONFIG ;\
-	$(KRB5_RUN_ENV) $(VALGRIND) ./t_std_conf  -d -s NEW.DEFAULT.REALM -d \
+	$(RUN_TEST_LOCAL_CONF) ./t_std_conf  -d -s NEW.DEFAULT.REALM -d \
 		-k IGGY.ORG -k DEFAULT_REALM.TST \
 		-D DEFAULT_REALM.TST -r bad.idea -r itar.bad.idea \
 		-r really.BAD.IDEA. -r clipper.bad.idea -r KeYEsCrOW.BaD.IDea \
@@ -223,8 +226,7 @@ check-unix-locate:: t_locate_kdc
 	if [ "$(OFFLINE)" = no ]; then \
 	    if $(DIG) $(SRVNAME) srv | grep -i $(DIGPAT) || \
 		$(NSLOOKUP) -q=srv $(SRVNAME) | grep -i $(NSPAT); then \
-		KRB5_CONFIG=$(srcdir)/td_krb5.conf ; export KRB5_CONFIG ;\
-		$(KRB5_RUN_ENV) $(VALGRIND) ./t_locate_kdc $(LOCREALM); \
+		$(RUN_TEST) ./t_locate_kdc $(LOCREALM); \
 	    else \
 		echo '*** WARNING: skipped t_locate_kdc test: known DNS name not found'; \
 	    fi; \
