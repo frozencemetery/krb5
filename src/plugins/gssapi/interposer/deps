@@ -1,0 +1,18 @@
+# 
+# Generated makefile dependencies follow.
+#
+reenter_gssi.so $(OUTPRE)reenter_gssi.$(OBJEXT): \
+  $(BUILDTOP)/include/autoconf.h $(BUILDTOP)/include/gssapi/gssapi.h \
+  $(BUILDTOP)/include/gssapi/gssapi_krb5.h \
+  $(COM_ERR_DEPS) \
+  reenter_gssi.c \
+  accept_sec_context.c \
+  acquire_cred.c \
+  context.c \
+  creds.c \
+  display_status.c \
+  import_and_canon_name.c \
+  indicate_mechs.c \
+  init_sec_context.c \
+  misc.c \
+  priv_integ.c

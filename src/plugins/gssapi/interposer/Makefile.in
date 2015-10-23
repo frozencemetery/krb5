@@ -1,0 +1,45 @@
+mydir = plugins$(S)gssapi$(S)interposer
+BUILDTOP = $(REL)..$(S)..$(S)..
+LIBBASE = reenter
+LIBMAJOR = 0
+LIBMINOR = 0
+RELDIR = ../plugins/gssapi/interposer
+
+LOCALINCLUDES = -I$(top_srcdir)/lib/gssapi/krb5 \
+	-I$(top_srcdir)/lib/gssapi/generic
+SHLIB_EXPDEPS = 
+SHLIB_EXPLIBS = -lgssapi_krb5 $(SUPPORT_LIB) $(LIBS) $(PTHREAD_CFLAGS)
+
+STLIBOBJS = \
+	reenter_gssi.o \
+	accept_sec_context.o \
+	acquire_cred.o \
+	context.o \
+	creds.o \
+	display_status.o \
+	import_and_canon_name.o \
+	indicate_mechs.o \
+	init_sec_context.o \
+	misc.o \
+	priv_integ.o
+
+SRCS = \
+	$(srcdir)/reenter_gssi.c \
+	$(srcdir)/accept_sec_context.c \
+	$(srcdir)/acquire_cred.c \
+	$(srcdir)/context.c \
+	$(srcdir)/creds.c \
+	$(srcdir)/display_status.c \
+	$(srcdir)/import_and_canon_name.c \
+	$(srcdir)/indicate_mechs.c \
+	$(srcdir)/init_sec_context.c \
+	$(srcdir)/misc.c \
+	$(srcdir)/priv_integ.c
+
+all-unix: all-libs
+install-unix:
+clean-unix:: clean-libs clean-libobjs
+
+@libnover_frag@
+@libobj_frag@
+
