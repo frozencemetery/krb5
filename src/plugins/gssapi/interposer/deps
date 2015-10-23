@@ -1,0 +1,7 @@
+# 
+# Generated makefile dependencies follow.
+#
+reenter.so $(OUTPRE)reenter.$(OBJEXT): \
+  $(BUILDTOP)/include/autoconf.h $(BUILDTOP)/include/gssapi/gssapi.h \
+  $(COM_ERR_DEPS) \
+  reenter_main.c reenter_gssi.c
