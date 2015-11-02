@@ -30,8 +30,11 @@
  */
 
 #ifndef _REENTER_GSSI_H_
-#define _REENTER_GSSI_H_
+#define _REENTER_GSSIH_
 
+gss_OID_set gss_mech_interposer(gss_OID mech_type);
+
+/* functions for re-entry */
 OM_uint32 gssi_acquire_cred(OM_uint32 *minor_status,
                             const gss_name_t desired_name,
                             OM_uint32 time_req,

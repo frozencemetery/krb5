@@ -21,9 +21,9 @@ SHLIB_EXPLIBS= -lgssapi_krb5 $(SUPPORT_LIB) $(LIBS)
 SHLIB_DIRS=-L$(TOPLIBD)
 SHLIB_RDIRS=$(KRB5_LIBDIR)
 STOBJLISTS=OBJS.ST
-STLIBOBJS=reenter_main.o reenter_gssi.o
+STLIBOBJS=reenter_gssi.o
 
-SRCS=reenter_main.c reenter_gssi.c
+SRCS=reenter_gssi.c
 
 all-unix:: $(LIBBASE)$(SO_EXT)
 install-unix:: install-libs
