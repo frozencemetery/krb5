@@ -31,6 +31,8 @@
 
 #include "autoconf.h"
 
+#include <errno.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -83,12 +85,27 @@ const gss_OID_desc gssproxy_mech_interposer = {
         fprintf(stderr, "reenter: " #fn "\n"); \
     } while (0);
 
+struct mech_mapping_elt {
+    gss_OID_desc real_oid;
+    gss_OID_desc fake_oid;
+    struct mech_mapping_elt *next;
+};
+struct mech_mapping_elt *mech_mapping = NULL;
+pthread_rwlock_t mech_mapping_lock;
+
 gss_OID_set gss_mech_interposer(gss_OID mech_type)
 {
     gss_OID_set interposed_mechs;
     OM_uint32 maj, min;
 
     LOG(gss_mech_interposer);
+
+    maj = pthread_rwlock_init(&mech_mapping_lock, NULL);
+    if (maj != 0) {
+        fprintf(stderr, "pthread_rwlock_init failed: %d - %s\n",
+                maj, strerror(maj));
+        goto done;
+    }
 
     interposed_mechs = NULL;
     maj = 0;
@@ -393,6 +410,88 @@ OM_uint32 gssi_accept_sec_context(OM_uint32 *minor_status,
                                   ret_flags,
                                   time_rec,
                                   delegated_cred_handle);
+}
+
+static const gss_OID fake_oid(gss_OID real) {
+    int res;
+    struct mech_mapping_elt *cur, *new;
+    gss_OID ret_oid = GSS_C_NO_OID;
+
+    do {
+        res = pthread_rwlock_rdlock(&mech_mapping_lock);
+    } while (res != EAGAIN);
+    if (res != 0) {
+        return GSS_C_NO_OID;
+    }
+
+    cur = mech_mapping;
+    if (cur != NULL) {
+        for ( ; cur->next != NULL; cur = cur->next) {
+            if (gss_oid_equal(real, &cur->real_oid)) {
+                ret_oid = &cur->fake_oid;
+                break;
+            }
+        }
+    }
+    pthread_rwlock_unlock(&mech_mapping_lock);
+
+    if (ret_oid != GSS_C_NO_OID) {
+        return ret_oid;
+    }
+
+    do {
+        res = pthread_rwlock_wrlock(&mech_mapping_lock);
+    } while (res != EAGAIN);
+    if (res != 0) {
+        return GSS_C_NO_OID;
+    }
+
+    if (cur == NULL) {
+        /* may have been created while we were blocking */
+        cur = mech_mapping;
+    }
+    if (cur != NULL) {
+        for ( ; cur->next != NULL; cur = cur->next) {
+            if (gss_oid_equal(real, &cur->real_oid)) {
+                ret_oid = &cur->fake_oid;
+                break;
+            }
+        }
+    }
+    if (ret_oid != GSS_C_NO_OID) {
+        goto write_done;
+    }
+
+    new = calloc(1, sizeof(struct mech_mapping_elt));
+    if (!new) {
+        goto write_done;
+    }
+    new->real_oid.length = real->length;
+    new->real_oid.elements = malloc(real->length);
+    new->fake_oid.length = real->length + gssproxy_mech_interposer.length;
+    new->fake_oid.elements = malloc(new->fake_oid.length);
+    if (!new->real_oid.elements || !new->fake_oid.elements) {
+        free(new->real_oid.elements);
+        free(new->fake_oid.elements);
+        free(new);
+        goto write_done;
+    }
+    memcpy(new->real_oid.elements, real->elements, real->length);
+    memcpy(new->fake_oid.elements, gssproxy_mech_interposer.elements,
+           gssproxy_mech_interposer.length);
+    memcpy((char *) new->fake_oid.elements + gssproxy_mech_interposer.length,
+           real->elements, real->length);
+
+    if (cur == NULL) {
+        mech_mapping = new;
+    } else {
+        cur->next = new;
+    }
+    ret_oid = &new->fake_oid;
+
+ write_done:    
+    pthread_rwlock_unlock(&mech_mapping_lock);
+    return ret_oid;
 }
 
 OM_uint32 gssi_init_sec_context(OM_uint32 *minor_status,
