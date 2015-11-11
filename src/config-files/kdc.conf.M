@@ -75,6 +75,9 @@ flag to
 If this relation is not specified, the compiled-in default of
 .I none
 is used.
+.IP kdc_max_dgram_reply_size
+Specifies the maximum packet size that can be sent over UDP.  The default
+value is 4096 bytes.
 
 .SH REALMS SECTION
 Each tag in the
