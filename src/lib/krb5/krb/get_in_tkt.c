@@ -530,6 +530,7 @@ krb5_init_creds_free(krb5_context context,
     }
     free(ctx->in_tkt_service);
     zap(ctx->password.data, ctx->password.length);
+    krb5_preauth_request_context_fini(context);
     krb5_free_data_contents(context, &ctx->password);
     krb5_free_error(context, ctx->err_reply);
     krb5_free_pa_data(context, ctx->err_padata);
