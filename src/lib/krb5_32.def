@@ -463,3 +463,6 @@ EXPORTS
 	krb5_vwrap_error_message			@430
 	krb5_c_prfplus					@431
 	krb5_c_derive_prfplus				@432
+
+; new in 1.15
+	krb5_expand_hostname				@433
