@@ -1,5 +1,5 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/crypto/openssl/hash_provider/hash_evp.c - OpenSSL hash providers */
+/* lib/crypto/builtin/hash_provider/sha2.c - SHA-2 hash providers */
 /*
  * Copyright (C) 2015 by the Massachusetts Institute of Technology.
  * All rights reserved.
@@ -31,79 +31,58 @@
  */
 
 #include "crypto_int.h"
-#include <openssl/evp.h>
+#include "sha2.h"
 
 static krb5_error_code
-hash_evp(const EVP_MD *type, const krb5_crypto_iov *data, size_t num_data,
-         krb5_data *output)
+k5_sha256_hash(const krb5_crypto_iov *data, size_t num_data, krb5_data *output)
 {
-    EVP_MD_CTX ctx;
-    const krb5_data *d;
+    SHA256_CTX ctx;
     size_t i;
-    int ok;
+    const krb5_crypto_iov *iov;
 
-    if (output->length != (unsigned int)EVP_MD_size(type))
+    if (output->length != SHA256_DIGEST_LENGTH)
         return KRB5_CRYPTO_INTERNAL;
 
-    EVP_MD_CTX_init(&ctx);
-    ok = EVP_DigestInit_ex(&ctx, type, NULL);
+    k5_sha256_init(&ctx);
     for (i = 0; i < num_data; i++) {
-        if (!SIGN_IOV(&data[i]))
-            continue;
-        d = &data[i].data;
-        ok = ok && EVP_DigestUpdate(&ctx, d->data, d->length);
+        iov = &data[i];
+        if (SIGN_IOV(iov))
+            k5_sha256_update(&ctx, iov->data.data, iov->data.length);
     }
-    ok = ok && EVP_DigestFinal_ex(&ctx, (uint8_t *)output->data, NULL);
-    EVP_MD_CTX_cleanup(&ctx);
-    return ok ? 0 : ENOMEM;
+    k5_sha256_final(output->data, &ctx);
+    return 0;
 }
 
 static krb5_error_code
-hash_md4(const krb5_crypto_iov *data, size_t num_data, krb5_data *output)
+k5_sha384_hash(const krb5_crypto_iov *data, size_t num_data, krb5_data *output)
 {
-    return hash_evp(EVP_md4(), data, num_data, output);
+    SHA384_CTX ctx;
+    size_t i;
+    const krb5_crypto_iov *iov;
+
+    if (output->length != SHA384_DIGEST_LENGTH)
+        return KRB5_CRYPTO_INTERNAL;
+
+    k5_sha384_init(&ctx);
+    for (i = 0; i < num_data; i++) {
+        iov = &data[i];
+        if (SIGN_IOV(iov))
+            k5_sha384_update(&ctx, iov->data.data, iov->data.length);
+    }
+    k5_sha384_final(output->data, &ctx);
+    return 0;
 }
-
-static krb5_error_code
-hash_md5(const krb5_crypto_iov *data, size_t num_data, krb5_data *output)
-{
-    return hash_evp(EVP_md5(), data, num_data, output);
-}
-
-static krb5_error_code
-hash_sha1(const krb5_crypto_iov *data, size_t num_data, krb5_data *output)
-{
-    return hash_evp(EVP_sha1(), data, num_data, output);
-}
-
-static krb5_error_code
-hash_sha256(const krb5_crypto_iov *data, size_t num_data, krb5_data *output)
-{
-    return hash_evp(EVP_sha256(), data, num_data, output);
-}
-
-static krb5_error_code
-hash_sha384(const krb5_crypto_iov *data, size_t num_data, krb5_data *output)
-{
-    return hash_evp(EVP_sha384(), data, num_data, output);
-}
-
-const struct krb5_hash_provider krb5int_hash_md4 = {
-    "MD4", 16, 64, hash_md4
-};
-
-const struct krb5_hash_provider krb5int_hash_md5 = {
-    "MD5", 16, 64, hash_md5
-};
-
-const struct krb5_hash_provider krb5int_hash_sha1 = {
-    "SHA1", 20, 64, hash_sha1
-};
 
 const struct krb5_hash_provider krb5int_hash_sha256 = {
-    "SHA-256", 32, 64, hash_sha256
+    "SHA-256",
+    SHA256_DIGEST_LENGTH,
+    SHA256_BLOCK_SIZE,
+    k5_sha256_hash
 };
 
 const struct krb5_hash_provider krb5int_hash_sha384 = {
-    "SHA-384", 48, 128, hash_sha384
+    "SHA-384",
+    SHA384_DIGEST_LENGTH,
+    SHA384_BLOCK_SIZE,
+    k5_sha384_hash
 };
