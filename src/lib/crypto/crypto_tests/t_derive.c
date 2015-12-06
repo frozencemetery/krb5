@@ -257,7 +257,7 @@ main(int argc, char **argv)
         kb.contents = (unsigned char *)test->inkey.data;
         assert(krb5_k_create_key(context, &kb, &inkey) == 0);
         enc = get_enc_provider(test->enctype);
-        assert(krb5int_derive_key(enc, inkey, &outkey, &test->constant,
+        assert(krb5int_derive_key(enc, NULL, inkey, &outkey, &test->constant,
                                   test->alg) == 0);
         if (verbose) {
             char buf[64];
