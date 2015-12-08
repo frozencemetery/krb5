@@ -1187,6 +1187,26 @@ _passes = [
                     'supported_enctypes': 'camellia256-cts:normal',
                     'master_key_type': 'camellia256-cts'}}}),
 
+    # Exercise the aes128-cts-sha256 enctype.
+    ('aes128-sha2', None,
+      {'libdefaults': {
+                'default_tgs_enctypes': 'aes128-cts-sha256',
+                'default_tkt_enctypes': 'aes128-cts-sha256',
+                'permitted_enctypes': 'aes128-cts-sha256'}},
+      {'realms': {'$realm': {
+                    'supported_enctypes': 'aes128-cts-sha256:normal',
+                    'master_key_type': 'aes128-cts-sha256'}}}),
+
+    # Exercise the aes256-cts-sha384 enctype.
+    ('aes256-sha2', None,
+      {'libdefaults': {
+                'default_tgs_enctypes': 'aes256-cts-sha384',
+                'default_tkt_enctypes': 'aes256-cts-sha384',
+                'permitted_enctypes': 'aes256-cts-sha384'}},
+      {'realms': {'$realm': {
+                    'supported_enctypes': 'aes256-cts-sha384:normal',
+                    'master_key_type': 'aes256-cts-sha384'}}}),
+
     # Test a setup with modern principal keys but an old TGT key.
     ('aes256.destgt', 'des-cbc-crc:normal',
      {'libdefaults': {'allow_weak_crypto': 'true'}},
