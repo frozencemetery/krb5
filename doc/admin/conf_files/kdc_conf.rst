@@ -730,8 +730,10 @@ des-cbc-raw                                          DES cbc mode raw (weak)
 des3-cbc-raw                                         Triple DES cbc mode raw (weak)
 des3-cbc-sha1 des3-hmac-sha1 des3-cbc-sha1-kd        Triple DES cbc mode with HMAC/sha1
 des-hmac-sha1                                        DES with HMAC/sha1 (weak)
-aes256-cts-hmac-sha1-96 aes256-cts AES-256           CTS mode with 96-bit SHA-1 HMAC
-aes128-cts-hmac-sha1-96 aes128-cts AES-128           CTS mode with 96-bit SHA-1 HMAC
+aes256-cts-hmac-sha1-96 aes256-cts                   AES-256 CTS mode with 96-bit SHA-1 HMAC
+aes128-cts-hmac-sha1-96 aes128-cts                   AES-128 CTS mode with 96-bit SHA-1 HMAC
+aes256-cts-hmac-sha384-192 aes256-cts-sha384         AES-256 CTS mode with 192-bit SHA-384 HMAC
+aes128-cts-hmac-sha256-128 aes128-cts-sha256         AES-128 CTS mode with 128-bit SHA-256 HMAC
 arcfour-hmac rc4-hmac arcfour-hmac-md5               RC4 with HMAC/MD5
 arcfour-hmac-exp rc4-hmac-exp arcfour-hmac-md5-exp   Exportable RC4 with HMAC/MD5 (weak)
 camellia256-cts-cmac camellia256-cts                 Camellia-256 CTS mode with CMAC
@@ -756,8 +758,13 @@ front.
 While **aes128-cts** and **aes256-cts** are supported for all Kerberos
 operations, they are not supported by very old versions of our GSSAPI
 implementation (krb5-1.3.1 and earlier).  Services running versions of
-krb5 without AES support must not be given AES keys in the KDC
-database.
+krb5 without AES support must not be given keys of these encryption
+types in the KDC database.
+
+The **aes128-cts-sha256** and **aes256-cts-sha384** encryption types
+are new in release 1.15.  Service running versions of krb5 without
+support for these newer encryption types must not be given keys of
+these encryption types in the KDC database.
 
 
 .. _Keysalt_lists:
