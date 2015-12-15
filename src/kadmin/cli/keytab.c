@@ -52,13 +52,8 @@ static int norandkey;
 static void
 add_usage()
 {
-#ifdef KADMIN_LOCAL
     fprintf(stderr, _("Usage: ktadd [-k[eytab] keytab] [-q] [-e keysaltlist] "
                       "[-norandkey] [principal | -glob princ-exp] [...]\n"));
-#else
-    fprintf(stderr, _("Usage: ktadd [-k[eytab] keytab] [-q] [-e keysaltlist] "
-                      "[principal | -glob princ-exp] [...]\n"));
-#endif
 }
 
 static void
@@ -140,13 +135,7 @@ kadmin_keytab_add(int argc, char **argv)
         } else if (strcmp(*argv, "-q") == 0) {
             quiet++;
         } else if (strcmp(*argv, "-norandkey") == 0) {
-#ifdef KADMIN_LOCAL
             norandkey++;
-#else
-            fprintf(stderr,
-                    _("-norandkey option only valid for kadmin.local\n"));
-            return;
-#endif
         } else if (strcmp(*argv, "-e") == 0) {
             argc--;
             if (argc < 1) {
@@ -277,7 +266,6 @@ add_principal(void *lhandle, char *keytab_str, krb5_keytab keytab,
         goto cleanup;
     }
 
-#ifdef KADMIN_LOCAL
     if (norandkey) {
         kadm5_key_data *key_data;
 
@@ -294,9 +282,7 @@ add_principal(void *lhandle, char *keytab_str, krb5_keytab keytab,
             }
             kadm5_free_kadm5_key_data(context, nkeys, key_data);
         }
-    } else
-#endif
-    {
+    } else {
         code = randkey_princ(lhandle, princ, keepold, n_ks_tuple, ks_tuple,
                              &keys, &nkeys);
     }

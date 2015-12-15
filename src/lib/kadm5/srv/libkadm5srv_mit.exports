@@ -93,6 +93,8 @@ xdr_cprinc_arg
 xdr_dpol_arg
 xdr_dprinc_arg
 xdr_generic_ret
+xdr_getpkeys_arg
+xdr_getpkeys_ret
 xdr_getprivs_ret
 xdr_gpol_arg
 xdr_gpol_ret
