@@ -354,7 +354,7 @@ krb5_klog_init(krb5_context kcontext, char *ename, char *whoami, krb5_boolean do
     const char  *logging_profent[3];
     const char  *logging_defent[3];
     char        **logging_specs;
-    int         i, ngood;
+    int         i, ngood, fd;
     char        *cp, *cp2;
     char        savec = '\0';
     int         error;
@@ -423,7 +423,10 @@ krb5_klog_init(krb5_context kcontext, char *ename, char *whoami, krb5_boolean do
                      * Check for append/overwrite, then open the file.
                      */
                     if (cp[4] == ':' || cp[4] == '=') {
-                        f = fopen(&cp[5], (cp[4] == ':') ? "a" : "w");
+                        fd = open(&cp[5], O_CREAT | O_WRONLY |
+                                  ((cp[4] == ':') ? O_APPEND: 0),
+                                  S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+                        f = fdopen(fd, (cp[4] == ':') ? "a" : "w");
                         if (f) {
                             set_cloexec_file(f);
                             log_control.log_entries[i].lfu_filep = f;
