@@ -278,12 +278,28 @@ add_principal(void *lhandle, char *keytab_str, krb5_keytab keytab,
     }
 
 #ifdef KADMIN_LOCAL
-    if (norandkey)
-        code = kadm5_get_principal_keys(handle, princ, &keys, &nkeys);
-    else
+    if (norandkey) {
+        kadm5_key_data *key_data;
+
+        code = kadm5_get_principal_keys(handle, princ, 0, &key_data, &nkeys);
+        if (code == 0) {
+            keys = calloc(nkeys, sizeof(krb5_keyblock));
+            if (!keys) {
+                com_err(whoami, ENOMEM, _("while extracting keys"));
+                goto cleanup;
+            }
+            for (i = 0; i < nkeys; i++) {
+                keys[i] = key_data[i].key;
+                memset(&key_data[i].key, 0 , sizeof(krb5_keyblock));
+            }
+            kadm5_free_kadm5_key_data(context, nkeys, key_data);
+        }
+    } else
 #endif
+    {
         code = randkey_princ(lhandle, princ, keepold, n_ks_tuple, ks_tuple,
                              &keys, &nkeys);
+    }
     if (code != 0) {
         if (code == KADM5_UNK_PRINC) {
             fprintf(stderr, _("%s: Principal %s does not exist.\n"),

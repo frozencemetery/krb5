@@ -19,6 +19,7 @@ kadm5_delete_principal
 kadm5_destroy
 kadm5_flush
 kadm5_free_config_params
+kadm5_free_kadm5_key_data
 kadm5_free_key_data
 kadm5_free_name_list
 kadm5_free_policy_ent
