@@ -452,6 +452,22 @@ exit_func:
     return &ret;
 }
 
+static kadm5_ret_t
+check_lockdown_keys(kadm5_server_handle_t handle, krb5_principal princ)
+{
+    kadm5_principal_ent_rec rec;
+    kadm5_ret_t ret;
+
+    ret = kadm5_get_principal(handle, princ, &rec, KADM5_ATTRIBUTES);
+    if (ret != KADM5_OK)
+        return ret;
+
+    if (rec.attributes & KRB5_KDB_LOCKDOWN_KEYS)
+        return KADM5_PROTECT_KEYS;
+
+    return KADM5_OK;
+}
+
 generic_ret *
 delete_principal_2_svc(dprinc_arg *arg, struct svc_req *rqstp)
 {
@@ -489,7 +505,18 @@ delete_principal_2_svc(dprinc_arg *arg, struct svc_req *rqstp)
         log_unauth("kadm5_delete_principal", prime_arg,
                    &client_name, &service_name, rqstp);
     } else {
+        ret.code = check_lockdown_keys(handle, arg->princ);
+        if (ret.code == KADM5_PROTECT_KEYS) {
+            log_unauth("kadm5_delete_principal", prime_arg,
+                       &client_name, &service_name, rqstp);
+            ret.code = KADM5_AUTH_DELETE;
+        }
+    }
+
+    if (ret.code == KADM5_OK) {
         ret.code = kadm5_delete_principal((void *)handle, arg->princ);
+    }
+    if (ret.code != KADM5_AUTH_DELETE) {
         if( ret.code != 0 )
             errmsg = krb5_get_error_message(handle->context, ret.code);
 
@@ -546,7 +573,19 @@ modify_principal_2_svc(mprinc_arg *arg, struct svc_req *rqstp)
         ret.code = KADM5_AUTH_MODIFY;
         log_unauth("kadm5_modify_principal", prime_arg,
                    &client_name, &service_name, rqstp);
+    } else if ((arg->mask & KADM5_ATTRIBUTES) &&
+               (!(arg->rec.attributes & KRB5_KDB_LOCKDOWN_KEYS))) {
+        ret.code = check_lockdown_keys(handle, arg->rec.principal);
+        if (ret.code == KADM5_PROTECT_KEYS) {
+            log_unauth("kadm5_modify_principal", prime_arg,
+                       &client_name, &service_name, rqstp);
+            ret.code = KADM5_AUTH_MODIFY;
+        }
     } else {
+        ret.code = KADM5_OK;
+    }
+
+    if (ret.code == KADM5_OK) {
         ret.code = kadm5_modify_principal((void *)handle, &arg->rec,
                                           arg->mask);
         if( ret.code != 0 )
@@ -619,6 +658,14 @@ rename_principal_2_svc(rprinc_arg *arg, struct svc_req *rqstp)
                 ret.code = KADM5_AUTH_INSUFFICIENT;
             else
                 ret.code = KADM5_AUTH_ADD;
+        }
+        if (ret.code == KADM5_OK) {
+            ret.code = check_lockdown_keys(handle, arg->src);
+            if (ret.code == KADM5_PROTECT_KEYS) {
+                log_unauth("kadm5_rename_principal", prime_arg1,
+                           &client_name, &service_name, rqstp);
+                ret.code = KADM5_AUTH_DELETE;
+            }
         }
     } else
         ret.code = KADM5_AUTH_INSUFFICIENT;
@@ -814,7 +861,14 @@ chpass_principal_2_svc(chpass_arg *arg, struct svc_req *rqstp)
         goto exit_func;
     }
 
-    if (cmp_gss_krb5_name(handle, rqst2name(rqstp), arg->princ)) {
+    ret.code = check_lockdown_keys(handle, arg->princ);
+    if (ret.code != KADM5_OK) {
+        if (ret.code == KADM5_PROTECT_KEYS) {
+            log_unauth("kadm5_chpass_principal", prime_arg,
+                       &client_name, &service_name, rqstp);
+            ret.code = KADM5_AUTH_CHANGEPW;
+        }
+    } else if (cmp_gss_krb5_name(handle, rqst2name(rqstp), arg->princ)) {
         ret.code = chpass_principal_wrapper_3((void *)handle, arg->princ,
                                               FALSE, 0, NULL, arg->pass);
     } else if (!(CHANGEPW_SERVICE(rqstp)) &&
@@ -877,7 +931,14 @@ chpass_principal3_2_svc(chpass3_arg *arg, struct svc_req *rqstp)
         goto exit_func;
     }
 
-    if (cmp_gss_krb5_name(handle, rqst2name(rqstp), arg->princ)) {
+    ret.code = check_lockdown_keys(handle, arg->princ);
+    if (ret.code != KADM5_OK) {
+        if (ret.code == KADM5_PROTECT_KEYS) {
+            log_unauth("kadm5_chpass_principal", prime_arg,
+                       &client_name, &service_name, rqstp);
+            ret.code = KADM5_AUTH_CHANGEPW;
+        }
+    } else if (cmp_gss_krb5_name(handle, rqst2name(rqstp), arg->princ)) {
         ret.code = chpass_principal_wrapper_3((void *)handle, arg->princ,
                                               arg->keepold,
                                               arg->n_ks_tuple,
@@ -946,7 +1007,14 @@ setv4key_principal_2_svc(setv4key_arg *arg, struct svc_req *rqstp)
         goto exit_func;
     }
 
-    if (!(CHANGEPW_SERVICE(rqstp)) &&
+    ret.code = check_lockdown_keys(handle, arg->princ);
+    if (ret.code != KADM5_OK) {
+        if (ret.code == KADM5_PROTECT_KEYS) {
+            log_unauth("kadm5_setv4key_principal", prime_arg,
+                       &client_name, &service_name, rqstp);
+            ret.code = KADM5_AUTH_SETKEY;
+        }
+    } else if (!(CHANGEPW_SERVICE(rqstp)) &&
         kadm5int_acl_check(handle->context, rqst2name(rqstp),
                            ACL_SETKEY, arg->princ, NULL)) {
         ret.code = kadm5_setv4key_principal((void *)handle, arg->princ,
@@ -1006,7 +1074,14 @@ setkey_principal_2_svc(setkey_arg *arg, struct svc_req *rqstp)
         goto exit_func;
     }
 
-    if (!(CHANGEPW_SERVICE(rqstp)) &&
+    ret.code = check_lockdown_keys(handle, arg->princ);
+    if (ret.code != KADM5_OK) {
+        if (ret.code == KADM5_PROTECT_KEYS) {
+            log_unauth("kadm5_setkey_principal", prime_arg,
+                       &client_name, &service_name, rqstp);
+            ret.code = KADM5_AUTH_SETKEY;
+        }
+    } else if (!(CHANGEPW_SERVICE(rqstp)) &&
         kadm5int_acl_check(handle->context, rqst2name(rqstp),
                            ACL_SETKEY, arg->princ, NULL)) {
         ret.code = kadm5_setkey_principal((void *)handle, arg->princ,
@@ -1066,7 +1141,14 @@ setkey_principal3_2_svc(setkey3_arg *arg, struct svc_req *rqstp)
         goto exit_func;
     }
 
-    if (!(CHANGEPW_SERVICE(rqstp)) &&
+    ret.code = check_lockdown_keys(handle, arg->princ);
+    if (ret.code != KADM5_OK) {
+        if (ret.code == KADM5_PROTECT_KEYS) {
+            log_unauth("kadm5_setkey_principal", prime_arg,
+                       &client_name, &service_name, rqstp);
+            ret.code = KADM5_AUTH_SETKEY;
+        }
+    } else if (!(CHANGEPW_SERVICE(rqstp)) &&
         kadm5int_acl_check(handle->context, rqst2name(rqstp),
                            ACL_SETKEY, arg->princ, NULL)) {
         ret.code = kadm5_setkey_principal_3((void *)handle, arg->princ,
@@ -1128,7 +1210,14 @@ setkey_principal4_svc(setkey4_arg *arg, struct svc_req *rqstp)
         goto exit_func;
     }
 
-    if (!(CHANGEPW_SERVICE(rqstp)) &&
+    ret.code = check_lockdown_keys(handle, arg->princ);
+    if (ret.code != KADM5_OK) {
+        if (ret.code == KADM5_PROTECT_KEYS) {
+            log_unauth("kadm5_setkey_principal", prime_arg,
+                       &client_name, &service_name, rqstp);
+            ret.code = KADM5_AUTH_SETKEY;
+        }
+    } else if (!(CHANGEPW_SERVICE(rqstp)) &&
         kadm5int_acl_check(handle->context, rqst2name(rqstp),
                            ACL_SETKEY, arg->princ, NULL)) {
         ret.code = kadm5_setkey_principal_4((void *)handle, arg->princ,
@@ -1157,6 +1246,32 @@ setkey_principal4_svc(setkey4_arg *arg, struct svc_req *rqstp)
 exit_func:
     free_server_handle(handle);
     return &ret;
+}
+
+/*
+ * Utility function that checks if the principal's keys can be extracted
+ * and clears them before they are returned to the client if they are
+ * protected by the lockdown attribute.
+ */
+static kadm5_ret_t
+chrand_check_lockdown(kadm5_server_handle_t handle, krb5_principal princ,
+                      krb5_keyblock **keys, int *nkeys)
+{
+    kadm5_ret_t ret;
+
+    ret = check_lockdown_keys(handle, princ);
+    if (ret != KADM5_OK) {
+        if (keys && nkeys) {
+            int i;
+            for (i = 0; i < *nkeys; i++) {
+                krb5_free_keyblock_contents(handle->context, &((*keys)[i]));
+            }
+            free(*keys);
+            *keys = NULL;
+            *nkeys = 0;
+        }
+    }
+    return ret;
 }
 
 chrand_ret *
@@ -1209,6 +1324,9 @@ chrand_principal_2_svc(chrand_arg *arg, struct svc_req *rqstp)
     }
 
     if(ret.code == KADM5_OK) {
+        ret.code = chrand_check_lockdown(handle, arg->princ, &k, &nkeys);
+        if (ret.code == KADM5_PROTECT_KEYS)
+            ret.code = KADM5_OK;
         ret.keys = k;
         ret.n_keys = nkeys;
     }
@@ -1286,6 +1404,9 @@ chrand_principal3_2_svc(chrand3_arg *arg, struct svc_req *rqstp)
     }
 
     if(ret.code == KADM5_OK) {
+        ret.code = chrand_check_lockdown(handle, arg->princ, &k, &nkeys);
+        if (ret.code == KADM5_PROTECT_KEYS)
+            ret.code = KADM5_OK;
         ret.keys = k;
         ret.n_keys = nkeys;
     }
@@ -1913,6 +2034,21 @@ get_principal_keys_svc(getpkeys_arg *arg, struct svc_req *rqstp)
         log_unauth("kadm5_get_principal_keys", prime_arg,
                    &client_name, &service_name, rqstp);
         ret.code = KADM5_AUTH_EXTRACT;
+    }
+
+    if (ret.code == KADM5_OK) {
+        ret.code = check_lockdown_keys(handle, arg->princ);
+        if (ret.code != KADM5_OK) {
+            kadm5_free_kadm5_key_data(handle->context, ret.n_key_data,
+                                      ret.key_data);
+            ret.key_data = NULL;
+            ret.n_key_data = 0;
+        }
+        if (ret.code == KADM5_PROTECT_KEYS) {
+            log_unauth("kadm5_get_principal_keys", prime_arg,
+                       &client_name, &service_name, rqstp);
+            ret.code = KADM5_AUTH_EXTRACT;
+        }
     }
 
     if (ret.code != KADM5_AUTH_EXTRACT) {
