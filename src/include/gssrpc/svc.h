@@ -164,7 +164,7 @@ typedef struct SVCXPRT {
 /*
  * Service request
  */
-struct svc_req {
+typedef struct svc_req {
 	rpcprog_t		rq_prog;	/* service program number */
 	rpcvers_t		rq_vers;	/* service protocol version */
 	rpcproc_t		rq_proc;	/* the desired procedure */
@@ -179,7 +179,7 @@ struct svc_req {
 	/* there.  This means that the transport must be single 	*/
 	/* threaded, but other parts of SunRPC already require that. 	*/
 	/*SVCAUTH		*rq_auth;	 associated auth flavor */
-};
+} SERVER;
 
 
 /*
