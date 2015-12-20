@@ -256,82 +256,82 @@ typedef struct getpkeys_ret getpkeys_ret;
 #define KADM 2112
 #define KADMVERS 2
 #define CREATE_PRINCIPAL 1
-extern  generic_ret * create_principal_2(cprinc_arg *, CLIENT *);
+extern  void cli_create_principal_2(generic_ret *, cprinc_arg *, CLIENT *);
 extern  generic_ret * create_principal_2_svc(cprinc_arg *, struct svc_req *);
 #define DELETE_PRINCIPAL 2
-extern  generic_ret * delete_principal_2(dprinc_arg *, CLIENT *);
+extern  void cli_delete_principal_2(generic_ret *, dprinc_arg *, CLIENT *);
 extern  generic_ret * delete_principal_2_svc(dprinc_arg *, struct svc_req *);
 #define MODIFY_PRINCIPAL 3
-extern  generic_ret * modify_principal_2(mprinc_arg *, CLIENT *);
+extern  void cli_modify_principal_2(generic_ret *, mprinc_arg *, CLIENT *);
 extern  generic_ret * modify_principal_2_svc(mprinc_arg *, struct svc_req *);
 #define RENAME_PRINCIPAL 4
-extern  generic_ret * rename_principal_2(rprinc_arg *, CLIENT *);
+extern  void cli_rename_principal_2(generic_ret *, rprinc_arg *, CLIENT *);
 extern  generic_ret * rename_principal_2_svc(rprinc_arg *, struct svc_req *);
 #define GET_PRINCIPAL 5
-extern  gprinc_ret * get_principal_2(gprinc_arg *, CLIENT *);
+extern  void cli_get_principal_2(gprinc_ret *, gprinc_arg *, CLIENT *);
 extern  gprinc_ret * get_principal_2_svc(gprinc_arg *, struct svc_req *);
 #define CHPASS_PRINCIPAL 6
-extern  generic_ret * chpass_principal_2(chpass_arg *, CLIENT *);
+extern  void cli_chpass_principal_2(generic_ret *, chpass_arg *, CLIENT *);
 extern  generic_ret * chpass_principal_2_svc(chpass_arg *, struct svc_req *);
 #define CHRAND_PRINCIPAL 7
-extern  chrand_ret * chrand_principal_2(chrand_arg *, CLIENT *);
+extern  void cli_chrand_principal_2(chrand_ret *, chrand_arg *, CLIENT *);
 extern  chrand_ret * chrand_principal_2_svc(chrand_arg *, struct svc_req *);
 #define CREATE_POLICY 8
-extern  generic_ret * create_policy_2(cpol_arg *, CLIENT *);
+extern  void cli_create_policy_2(generic_ret *, cpol_arg *, CLIENT *);
 extern  generic_ret * create_policy_2_svc(cpol_arg *, struct svc_req *);
 #define DELETE_POLICY 9
-extern  generic_ret * delete_policy_2(dpol_arg *, CLIENT *);
+extern  void cli_delete_policy_2(generic_ret *, dpol_arg *, CLIENT *);
 extern  generic_ret * delete_policy_2_svc(dpol_arg *, struct svc_req *);
 #define MODIFY_POLICY 10
-extern  generic_ret * modify_policy_2(mpol_arg *, CLIENT *);
+extern  void cli_modify_policy_2(generic_ret *, mpol_arg *, CLIENT *);
 extern  generic_ret * modify_policy_2_svc(mpol_arg *, struct svc_req *);
 #define GET_POLICY 11
-extern  gpol_ret * get_policy_2(gpol_arg *, CLIENT *);
+extern  void cli_get_policy_2(gpol_ret *, gpol_arg *, CLIENT *);
 extern  gpol_ret * get_policy_2_svc(gpol_arg *, struct svc_req *);
 #define GET_PRIVS 12
-extern  getprivs_ret * get_privs_2(void *, CLIENT *);
+extern  void cli_get_privs_2(getprivs_ret *, void *, CLIENT *);
 extern  getprivs_ret * get_privs_2_svc(krb5_ui_4 *, struct svc_req *);
 #define INIT 13
-extern  generic_ret * init_2(void *, CLIENT *);
+extern  void cli_init_2(generic_ret *, void *, CLIENT *);
 extern  generic_ret * init_2_svc(krb5_ui_4 *, struct svc_req *);
 #define GET_PRINCS 14
-extern  gprincs_ret * get_princs_2(gprincs_arg *, CLIENT *);
+extern  void cli_get_princs_2(gprincs_ret *, gprincs_arg *, CLIENT *);
 extern  gprincs_ret * get_princs_2_svc(gprincs_arg *, struct svc_req *);
 #define GET_POLS 15
-extern  gpols_ret * get_pols_2(gpols_arg *, CLIENT *);
+extern  void cli_get_pols_2(gpols_ret *, gpols_arg *, CLIENT *);
 extern  gpols_ret * get_pols_2_svc(gpols_arg *, struct svc_req *);
 #define SETKEY_PRINCIPAL 16
-extern  generic_ret * setkey_principal_2(setkey_arg *, CLIENT *);
+extern  void cli_setkey_principal_2(generic_ret *, setkey_arg *, CLIENT *);
 extern  generic_ret * setkey_principal_2_svc(setkey_arg *, struct svc_req *);
 #define SETV4KEY_PRINCIPAL 17
-extern  generic_ret * setv4key_principal_2(setv4key_arg *, CLIENT *);
+extern  void cli_setv4key_principal_2(generic_ret *, setv4key_arg *, CLIENT *);
 extern  generic_ret * setv4key_principal_2_svc(setv4key_arg *, struct svc_req *);
 #define CREATE_PRINCIPAL3 18
-extern  generic_ret * create_principal3_2(cprinc3_arg *, CLIENT *);
+extern  void cli_create_principal3_2(generic_ret *, cprinc3_arg *, CLIENT *);
 extern  generic_ret * create_principal3_2_svc(cprinc3_arg *, struct svc_req *);
 #define CHPASS_PRINCIPAL3 19
-extern  generic_ret * chpass_principal3_2(chpass3_arg *, CLIENT *);
+extern  void cli_chpass_principal3_2(generic_ret *, chpass3_arg *, CLIENT *);
 extern  generic_ret * chpass_principal3_2_svc(chpass3_arg *, struct svc_req *);
 #define CHRAND_PRINCIPAL3 20
-extern  chrand_ret * chrand_principal3_2(chrand3_arg *, CLIENT *);
+extern  void cli_chrand_principal3_2(chrand_ret *, chrand3_arg *, CLIENT *);
 extern  chrand_ret * chrand_principal3_2_svc(chrand3_arg *, struct svc_req *);
 #define SETKEY_PRINCIPAL3 21
-extern  generic_ret * setkey_principal3_2(setkey3_arg *, CLIENT *);
+extern  void cli_setkey_principal3_2(generic_ret *, setkey3_arg *, CLIENT *);
 extern  generic_ret * setkey_principal3_2_svc(setkey3_arg *, struct svc_req *);
 #define PURGEKEYS 22
-extern  generic_ret * purgekeys_2(purgekeys_arg *, CLIENT *);
+extern  void cli_purgekeys_2(generic_ret *, purgekeys_arg *, CLIENT *);
 extern  generic_ret * purgekeys_2_svc(purgekeys_arg *, struct svc_req *);
 #define GET_STRINGS 23
-extern  gstrings_ret * get_strings_2(gstrings_arg *, CLIENT *);
+extern  void cli_get_strings_2(gstrings_ret *, gstrings_arg *, CLIENT *);
 extern  gstrings_ret * get_strings_2_svc(gstrings_arg *, struct svc_req *);
 #define SET_STRING 24
-extern  generic_ret * set_string_2(sstring_arg *, CLIENT *);
+extern  void cli_set_string_2(generic_ret *, sstring_arg *, CLIENT *);
 extern  generic_ret * set_string_2_svc(sstring_arg *, struct svc_req *);
 #define SETKEY_PRINCIPAL4 25
-extern  generic_ret * setkey_principal4(setkey4_arg *, CLIENT *);
+extern  void cli_setkey_principal4(generic_ret *, setkey4_arg *, CLIENT *);
 extern  generic_ret * setkey_principal4_svc(setkey4_arg *, struct svc_req *);
 #define EXTRACT_KEYS 26
-extern  getpkeys_ret * get_principal_keys(getpkeys_arg *, CLIENT *);
+extern void cli_get_principal_keys(getpkeys_ret *, getpkeys_arg *, CLIENT *);
 extern  getpkeys_ret * get_principal_keys_svc(getpkeys_arg *, struct svc_req *);
 
 extern bool_t xdr_cprinc_arg ();

@@ -26,7 +26,7 @@ kadm5_create_principal(void *server_handle,
                        kadm5_principal_ent_t princ, long mask,
                        char *pw)
 {
-    generic_ret         *r;
+    generic_ret           r = { 0, 0 };
     cprinc_arg          arg;
     kadm5_server_handle_t handle = server_handle;
 
@@ -54,11 +54,9 @@ kadm5_create_principal(void *server_handle,
         arg.rec.tl_data = NULL;
     }
 
-    r = create_principal_2(&arg, handle->clnt);
+    cli_create_principal_2(&r, &arg, handle->clnt);
 
-    if(r == NULL)
-        eret();
-    return r->code;
+    return r.code;
 }
 
 kadm5_ret_t
@@ -68,7 +66,7 @@ kadm5_create_principal_3(void *server_handle,
                          krb5_key_salt_tuple *ks_tuple,
                          char *pw)
 {
-    generic_ret         *r;
+    generic_ret         r = { 0, 0 };
     cprinc3_arg         arg;
     kadm5_server_handle_t handle = server_handle;
 
@@ -98,18 +96,15 @@ kadm5_create_principal_3(void *server_handle,
         arg.rec.tl_data = NULL;
     }
 
-    r = create_principal3_2(&arg, handle->clnt);
-
-    if(r == NULL)
-        eret();
-    return r->code;
+    cli_create_principal3_2(&r, &arg, handle->clnt);
+    return r.code;
 }
 
 kadm5_ret_t
 kadm5_delete_principal(void *server_handle, krb5_principal principal)
 {
     dprinc_arg          arg;
-    generic_ret         *r;
+    generic_ret         r = { 0, 0 };
     kadm5_server_handle_t handle = server_handle;
 
     CHECK_HANDLE(server_handle);
@@ -118,10 +113,8 @@ kadm5_delete_principal(void *server_handle, krb5_principal principal)
         return EINVAL;
     arg.princ = principal;
     arg.api_version = handle->api_version;
-    r = delete_principal_2(&arg, handle->clnt);
-    if(r == NULL)
-        eret();
-    return r->code;
+    cli_delete_principal_2(&r, &arg, handle->clnt);
+    return r.code;
 }
 
 kadm5_ret_t
@@ -129,7 +122,7 @@ kadm5_modify_principal(void *server_handle,
                        kadm5_principal_ent_t princ, long mask)
 {
     mprinc_arg          arg;
-    generic_ret         *r;
+    generic_ret         r = { 0, 0 };
     kadm5_server_handle_t handle = server_handle;
 
     CHECK_HANDLE(server_handle);
@@ -153,11 +146,8 @@ kadm5_modify_principal(void *server_handle,
 
     arg.rec.mod_name = NULL;
 
-    r = modify_principal_2(&arg, handle->clnt);
-
-    if(r == NULL)
-        eret();
-    return r->code;
+    cli_modify_principal_2(&r, &arg, handle->clnt);
+    return r.code;
 }
 
 kadm5_ret_t
@@ -166,7 +156,7 @@ kadm5_get_principal(void *server_handle,
                     long mask)
 {
     gprinc_arg  arg;
-    gprinc_ret  *r;
+    gprinc_ret  r;
     kadm5_server_handle_t handle = server_handle;
 
     CHECK_HANDLE(server_handle);
@@ -176,13 +166,12 @@ kadm5_get_principal(void *server_handle,
     arg.princ = princ;
     arg.mask = mask;
     arg.api_version = handle->api_version;
-    r = get_principal_2(&arg, handle->clnt);
-    if(r == NULL)
-        eret();
-    if (r->code == 0)
-        memcpy(ent, &r->rec, sizeof(r->rec));
+    memset(&r, 0, sizeof(gprinc_ret));
+    cli_get_principal_2(&r, &arg, handle->clnt);
+    if (r.code == 0)
+        memcpy(ent, &r.rec, sizeof(r.rec));
 
-    return r->code;
+    return r.code;
 }
 
 kadm5_ret_t
@@ -190,7 +179,7 @@ kadm5_get_principals(void *server_handle,
                      char *exp, char ***princs, int *count)
 {
     gprincs_arg arg;
-    gprincs_ret *r;
+    gprincs_ret r;
     kadm5_server_handle_t handle = server_handle;
 
     CHECK_HANDLE(server_handle);
@@ -199,18 +188,17 @@ kadm5_get_principals(void *server_handle,
         return EINVAL;
     arg.exp = exp;
     arg.api_version = handle->api_version;
-    r = get_princs_2(&arg, handle->clnt);
-    if(r == NULL)
-        eret();
-    if(r->code == 0) {
-        *count = r->count;
-        *princs = r->princs;
+    memset(&r, 0, sizeof(gprincs_ret));
+    cli_get_princs_2(&r, &arg, handle->clnt);
+    if (r.code == 0) {
+        *count = r.count;
+        *princs = r.princs;
     } else {
         *count = 0;
         *princs = NULL;
     }
 
-    return r->code;
+    return r.code;
 }
 
 kadm5_ret_t
@@ -218,7 +206,7 @@ kadm5_rename_principal(void *server_handle,
                        krb5_principal source, krb5_principal dest)
 {
     rprinc_arg          arg;
-    generic_ret         *r;
+    generic_ret         r = { 0, 0 };
     kadm5_server_handle_t handle = server_handle;
 
     CHECK_HANDLE(server_handle);
@@ -228,10 +216,8 @@ kadm5_rename_principal(void *server_handle,
     arg.api_version = handle->api_version;
     if (source == NULL || dest == NULL)
         return EINVAL;
-    r = rename_principal_2(&arg, handle->clnt);
-    if(r == NULL)
-        eret();
-    return r->code;
+    cli_rename_principal_2(&r, &arg, handle->clnt);
+    return r.code;
 }
 
 kadm5_ret_t
@@ -239,7 +225,7 @@ kadm5_chpass_principal(void *server_handle,
                        krb5_principal princ, char *password)
 {
     chpass_arg          arg;
-    generic_ret         *r;
+    generic_ret         r = { 0, 0 };
     kadm5_server_handle_t handle = server_handle;
 
     CHECK_HANDLE(server_handle);
@@ -250,10 +236,8 @@ kadm5_chpass_principal(void *server_handle,
 
     if(princ == NULL)
         return EINVAL;
-    r = chpass_principal_2(&arg, handle->clnt);
-    if(r == NULL)
-        eret();
-    return r->code;
+    cli_chpass_principal_2(&r, &arg, handle->clnt);
+    return r.code;
 }
 
 kadm5_ret_t
@@ -263,7 +247,7 @@ kadm5_chpass_principal_3(void *server_handle,
                          char *password)
 {
     chpass3_arg         arg;
-    generic_ret         *r;
+    generic_ret         r = { 0, 0 };
     kadm5_server_handle_t handle = server_handle;
 
     CHECK_HANDLE(server_handle);
@@ -277,10 +261,8 @@ kadm5_chpass_principal_3(void *server_handle,
 
     if(princ == NULL)
         return EINVAL;
-    r = chpass_principal3_2(&arg, handle->clnt);
-    if(r == NULL)
-        eret();
-    return r->code;
+    cli_chpass_principal3_2(&r, &arg, handle->clnt);
+    return r.code;
 }
 
 kadm5_ret_t
@@ -289,7 +271,7 @@ kadm5_setv4key_principal(void *server_handle,
                          krb5_keyblock *keyblock)
 {
     setv4key_arg        arg;
-    generic_ret         *r;
+    generic_ret         r = { 0, 0 };
     kadm5_server_handle_t handle = server_handle;
 
     CHECK_HANDLE(server_handle);
@@ -300,10 +282,8 @@ kadm5_setv4key_principal(void *server_handle,
 
     if(princ == NULL || keyblock == NULL)
         return EINVAL;
-    r = setv4key_principal_2(&arg, handle->clnt);
-    if(r == NULL)
-        eret();
-    return r->code;
+    cli_setv4key_principal_2(&r, &arg, handle->clnt);
+    return r.code;
 }
 
 kadm5_ret_t
@@ -313,7 +293,7 @@ kadm5_setkey_principal(void *server_handle,
                        int n_keys)
 {
     setkey_arg          arg;
-    generic_ret         *r;
+    generic_ret         r = { 0, 0 };
     kadm5_server_handle_t handle = server_handle;
 
     CHECK_HANDLE(server_handle);
@@ -325,10 +305,8 @@ kadm5_setkey_principal(void *server_handle,
 
     if(princ == NULL || keyblocks == NULL)
         return EINVAL;
-    r = setkey_principal_2(&arg, handle->clnt);
-    if(r == NULL)
-        eret();
-    return r->code;
+    cli_setkey_principal_2(&r, &arg, handle->clnt);
+    return r.code;
 }
 
 kadm5_ret_t
@@ -340,7 +318,7 @@ kadm5_setkey_principal_3(void *server_handle,
                          int n_keys)
 {
     setkey3_arg         arg;
-    generic_ret         *r;
+    generic_ret         r = { 0, 0 };
     kadm5_server_handle_t handle = server_handle;
 
     CHECK_HANDLE(server_handle);
@@ -355,10 +333,8 @@ kadm5_setkey_principal_3(void *server_handle,
 
     if(princ == NULL || keyblocks == NULL)
         return EINVAL;
-    r = setkey_principal3_2(&arg, handle->clnt);
-    if(r == NULL)
-        eret();
-    return r->code;
+    cli_setkey_principal3_2(&r, &arg, handle->clnt);
+    return r.code;
 }
 
 kadm5_ret_t
@@ -369,7 +345,7 @@ kadm5_setkey_principal_4(void *server_handle,
                          int n_key_data)
 {
     setkey4_arg         arg;
-    generic_ret         *r;
+    generic_ret         r = { 0, 0 };
     kadm5_server_handle_t handle = server_handle;
 
     CHECK_HANDLE(server_handle);
@@ -382,10 +358,8 @@ kadm5_setkey_principal_4(void *server_handle,
 
     if (princ == NULL || key_data == NULL || n_key_data == 0)
         return EINVAL;
-    r = setkey_principal4(&arg, handle->clnt);
-    if (r == NULL)
-        eret();
-    return r->code;
+    cli_setkey_principal4(&r, &arg, handle->clnt);
+    return r.code;
 }
 
 kadm5_ret_t
@@ -396,43 +370,36 @@ kadm5_randkey_principal_3(void *server_handle,
                           krb5_keyblock **key, int *n_keys)
 {
     chrand3_arg         arg;
-    chrand_ret          *r;
+    chrand_ret          r;
     kadm5_server_handle_t handle = server_handle;
-    int                 i, ret;
+    int                 i;
 
     CHECK_HANDLE(server_handle);
+
+    if (princ == NULL)
+        return EINVAL;
 
     arg.princ = princ;
     arg.api_version = handle->api_version;
     arg.keepold = keepold;
     arg.n_ks_tuple = n_ks_tuple;
     arg.ks_tuple = ks_tuple;
+    memset(&r, 0, sizeof(chrand_ret));
 
-    if(princ == NULL)
-        return EINVAL;
-    r = chrand_principal3_2(&arg, handle->clnt);
-    if(r == NULL)
-        eret();
+    cli_chrand_principal3_2(&r, &arg, handle->clnt);
+    if (r.code)
+        return r.code;
     if (n_keys)
-        *n_keys = r->n_keys;
+        *n_keys = r.n_keys;
     if (key) {
-        if(r->n_keys) {
-            *key = malloc(r->n_keys * sizeof(krb5_keyblock));
-            if (*key == NULL)
-                return ENOMEM;
-            for (i = 0; i < r->n_keys; i++) {
-                ret = krb5_copy_keyblock_contents(handle->context, &r->keys[i],
-                                                  &(*key)[i]);
-                if (ret) {
-                    free(*key);
-                    return ENOMEM;
-                }
-            }
-        } else
-            *key = NULL;
+        *key = r.keys;
+    } else {
+        for (i = 0; i < r.n_keys; i++) {
+            krb5_free_keyblock_contents(handle->context, &r.keys[i]);
+        }
+        free(r.keys);
     }
-
-    return r->code;
+    return r.code;
 }
 
 kadm5_ret_t
@@ -441,40 +408,33 @@ kadm5_randkey_principal(void *server_handle,
                         krb5_keyblock **key, int *n_keys)
 {
     chrand_arg          arg;
-    chrand_ret          *r;
+    chrand_ret          r;
     kadm5_server_handle_t handle = server_handle;
-    int                 i, ret;
+    int                 i;
 
     CHECK_HANDLE(server_handle);
 
+    if (princ == NULL)
+        return EINVAL;
+
     arg.princ = princ;
     arg.api_version = handle->api_version;
+    memset(&r, 0, sizeof(chrand_ret));
 
-    if(princ == NULL)
-        return EINVAL;
-    r = chrand_principal_2(&arg, handle->clnt);
-    if(r == NULL)
-        eret();
+    cli_chrand_principal_2(&r, &arg, handle->clnt);
+    if (r.code)
+        return r.code;
     if (n_keys)
-        *n_keys = r->n_keys;
+        *n_keys = r.n_keys;
     if (key) {
-        if(r->n_keys) {
-            *key = malloc(r->n_keys * sizeof(krb5_keyblock));
-            if (*key == NULL)
-                return ENOMEM;
-            for (i = 0; i < r->n_keys; i++) {
-                ret = krb5_copy_keyblock_contents(handle->context, &r->keys[i],
-                                                  &(*key)[i]);
-                if (ret) {
-                    free(*key);
-                    return ENOMEM;
-                }
-            }
-        } else
-            *key = NULL;
+        *key = r.keys;
+    } else {
+        for (i = 0; i < r.n_keys; i++) {
+            krb5_free_keyblock_contents(handle->context, &r.keys[i]);
+        }
+        free(r.keys);
     }
-
-    return r->code;
+    return r.code;
 }
 
 /* not supported on client side */
@@ -493,7 +453,7 @@ kadm5_purgekeys(void *server_handle,
                 int keepkvno)
 {
     purgekeys_arg       arg;
-    generic_ret         *r;
+    generic_ret         r = { 0, 0 };
     kadm5_server_handle_t handle = server_handle;
 
     CHECK_HANDLE(server_handle);
@@ -504,10 +464,8 @@ kadm5_purgekeys(void *server_handle,
 
     if (princ == NULL)
         return EINVAL;
-    r = purgekeys_2(&arg, handle->clnt);
-    if(r == NULL)
-        eret();
-    return r->code;
+    cli_purgekeys_2(&r, &arg, handle->clnt);
+    return r.code;
 }
 
 kadm5_ret_t
@@ -515,7 +473,7 @@ kadm5_get_strings(void *server_handle, krb5_principal principal,
                   krb5_string_attr **strings_out, int *count_out)
 {
     gstrings_arg arg;
-    gstrings_ret *r;
+    gstrings_ret r;
     kadm5_server_handle_t handle = server_handle;
 
     *strings_out = NULL;
@@ -526,14 +484,13 @@ kadm5_get_strings(void *server_handle, krb5_principal principal,
 
     arg.princ = principal;
     arg.api_version = handle->api_version;
-    r = get_strings_2(&arg, handle->clnt);
-    if (r == NULL)
-        eret();
-    if (r->code == 0) {
-        *strings_out = r->strings;
-        *count_out = r->count;
+    memset(&r, 0, sizeof(gstrings_ret));
+    cli_get_strings_2(&r, &arg, handle->clnt);
+    if (r.code == 0) {
+        *strings_out = r.strings;
+        *count_out = r.count;
     }
-    return r->code;
+    return r.code;
 }
 
 kadm5_ret_t
@@ -541,7 +498,7 @@ kadm5_set_string(void *server_handle, krb5_principal principal,
                  const char *key, const char *value)
 {
     sstring_arg arg;
-    generic_ret *r;
+    generic_ret r = { 0, 0 };
     kadm5_server_handle_t handle = server_handle;
 
     CHECK_HANDLE(server_handle);
@@ -552,10 +509,8 @@ kadm5_set_string(void *server_handle, krb5_principal principal,
     arg.key = (char *)key;
     arg.value = (char *)value;
     arg.api_version = handle->api_version;
-    r = set_string_2(&arg, handle->clnt);
-    if (r == NULL)
-        eret();
-    return r->code;
+    cli_set_string_2(&r, &arg, handle->clnt);
+    return r.code;
 }
 
 kadm5_ret_t
@@ -566,24 +521,23 @@ kadm5_get_principal_keys(void *server_handle,
                          int *n_key_data)
 {
     getpkeys_arg        arg;
-    getpkeys_ret        *r;
+    getpkeys_ret        r;
     kadm5_server_handle_t handle = server_handle;
 
     CHECK_HANDLE(server_handle);
 
+    if (princ == NULL || key_data == NULL || n_key_data == 0)
+        return EINVAL;
+
     arg.api_version = handle->api_version;
     arg.princ = princ;
     arg.kvno = kvno;
+    memset(&r, 0, sizeof(getpkeys_ret));
 
-    if (princ == NULL || key_data == NULL || n_key_data == 0)
-        return EINVAL;
-    r = get_principal_keys(&arg, handle->clnt);
-    if (r == NULL)
-        eret();
-    if (r->code == 0) {
-        *key_data = r->key_data;
-        *n_key_data = r->n_key_data;
-    }
-    return r->code;
+    cli_get_principal_keys(&r, &arg, handle->clnt);
+
+    *key_data = r.key_data;
+    *n_key_data = r.n_key_data;
+    return r.code;
 }
 
