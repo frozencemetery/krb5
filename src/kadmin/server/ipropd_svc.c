@@ -327,8 +327,8 @@ ipropx_resync(uint32_t vers, struct svc_req *rqstp)
      * versioned (-i0 for legacy dump format, -i1 for ipropx
      * version 1 format, etc)
      */
-    if (asprintf(&ubuf, "%s dump -i%d %s </dev/null 2>&1",
-		 KPROPD_DEFAULT_KDB5_UTIL, vers, tmpf) < 0) {
+    if (asprintf(&ubuf, "%s -r %s dump -i%d %s </dev/null 2>&1",
+                 KPROPD_DEFAULT_KDB5_UTIL, handle->params.realm, vers, tmpf) < 0) {
 	krb5_klog_syslog(LOG_ERR,
 			 _("%s: cannot construct kdb5 util dump string too long; out of memory"),
 			 whoami);
@@ -375,16 +375,17 @@ ipropx_resync(uint32_t vers, struct svc_req *rqstp)
 	    _exit(1);
 	}
 
-	DPRINT(("%s: exec `kprop -f %s %s' ...\n",
-		whoami, tmpf, clhost));
+
+	DPRINT(("%s: exec `kprop -r %s -f %s %s' ...\n",
+		handle->params.realm, whoami, tmpf, clhost));
 	/* XXX Yuck!  */
 	if (getenv("KPROP_PORT"))
-	    pret = execl(KPROPD_DEFAULT_KPROP, "kprop", "-f", tmpf,
-			 "-P", getenv("KPROP_PORT"),
+            pret = execl(KPROPD_DEFAULT_KPROP, "kprop", "-r", handle->params.realm, "-f",
+                         tmpf, "-P", getenv("KPROP_PORT"),
 			 clhost, NULL);
 	else
-	    pret = execl(KPROPD_DEFAULT_KPROP, "kprop", "-f", tmpf,
-			 clhost, NULL);
+            pret = execl(KPROPD_DEFAULT_KPROP, "kprop", "-r", handle->params.realm, "-f",
+                         tmpf, clhost, NULL);
 	if (pret == -1) {
 	    if (nofork) {
 		perror(whoami);

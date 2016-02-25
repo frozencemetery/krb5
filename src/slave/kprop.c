@@ -55,6 +55,7 @@ int     debug = 0;
 char    *srvtab = 0;
 char    *slave_host;
 char    *realm = 0;
+char    *def_realm = NULL;
 char    *file = KPROP_DEFAULT_FILE;
 
 krb5_principal  my_principal;           /* The Kerberos principal we'll be */
@@ -66,7 +67,7 @@ krb5_address    *sender_addr;
 krb5_address    *receiver_addr;
 const char      *port = KPROP_SERVICE;
 
-void    PRS(int, char **);
+void    PRS(krb5_context, int, char **);
 void    get_tickets(krb5_context);
 static void usage(void);
 static void open_connection(krb5_context, char *, int *);
@@ -103,7 +104,7 @@ main(argc, argv)
         com_err(argv[0], retval, _("while initializing krb5"));
         exit(1);
     }
-    PRS(argc, argv);
+    PRS(context,argc, argv);
     get_tickets(context);
 
     database_fd = open_database(context, file, &database_size);
@@ -116,14 +117,17 @@ main(argc, argv)
     printf(_("Database propagation to %s: SUCCEEDED\n"), slave_host);
     krb5_free_cred_contents(context, my_creds);
     close_database(context, database_fd);
+    krb5_free_default_realm(context, def_realm);
     exit(0);
 }
 
-void PRS(argc, argv)
+void PRS(context, argc, argv)
+    krb5_context context;
     int     argc;
     char    **argv;
 {
     register char   *word, ch;
+    krb5_error_code ret;
 
     progname = *argv++;
     while (--argc && (word = *argv++)) {
@@ -181,46 +185,61 @@ void PRS(argc, argv)
     }
     if (!slave_host)
         usage();
+
+    if (realm == NULL) {
+        ret = krb5_get_default_realm(context, &def_realm);
+        if (ret) {
+            com_err(progname, errno, _("while getting default realm"));
+            exit(1);
+        }
+        realm = def_realm;
+    }
+}
+
+/* Runs krb5_sname_to_principal with a substitute realm
+ * Duplicated in kpropd.c, sharing TBD */
+static krb5_error_code
+sn2princ_with_realm(krb5_context context, const char *hostname,
+                    const char *sname, krb5_int32 type, const char *rrealm,
+                    krb5_principal *princ_out)
+{
+    krb5_error_code ret;
+    krb5_principal princ = NULL;
+
+    *princ_out = NULL;
+
+    if (rrealm == NULL)
+        return EINVAL;
+
+    ret = krb5_sname_to_principal(context, hostname, sname, type, &princ);
+    if (ret)
+        return ret;
+
+    ret = krb5_set_principal_realm(context, princ, rrealm);
+    if (ret) {
+        krb5_free_principal(context, princ);
+        return ret;
+    }
+
+    *princ_out = princ;
+    return 0;
 }
 
 void get_tickets(context)
     krb5_context context;
 {
-    char buf[] = "MEMORY:_kproptkt", *def_realm;
+    char buf[] = "MEMORY:_kproptkt";
     krb5_error_code retval;
     krb5_keytab keytab = NULL;
 
     /*
      * Figure out what tickets we'll be using to send stuff
      */
-    retval = krb5_sname_to_principal(context, NULL, NULL,
-                                     KRB5_NT_SRV_HST, &my_principal);
+    retval = sn2princ_with_realm(context, NULL, NULL, KRB5_NT_SRV_HST, realm,
+                                 &my_principal);
     if (retval) {
         com_err(progname, errno, _("while setting client principal name"));
         exit(1);
-    }
-    if (realm) {
-        retval = krb5_set_principal_realm(context, my_principal, realm);
-        if (retval) {
-            com_err(progname, errno,
-                    _("while setting client principal realm"));
-            exit(1);
-        }
-    } else if (krb5_is_referral_realm(krb5_princ_realm(context,
-                                                       my_principal))) {
-        /* We're going to use this as a client principal, so it can't have the
-         * referral realm.  Use the default realm instead. */
-        retval = krb5_get_default_realm(context, &def_realm);
-        if (retval) {
-            com_err(progname, errno, _("while getting default realm"));
-            exit(1);
-        }
-        retval = krb5_set_principal_realm(context, my_principal, def_realm);
-        if (retval) {
-            com_err(progname, errno,
-                    _("while setting client principal realm"));
-            exit(1);
-        }
     }
 
 #if 0
@@ -248,21 +267,12 @@ void get_tickets(context)
      * Construct the principal name for the slave host.
      */
     memset(&creds, 0, sizeof(creds));
-    retval = krb5_sname_to_principal(context,
-                                     slave_host, KPROP_SERVICE_NAME,
-                                     KRB5_NT_SRV_HST, &creds.server);
+    retval = sn2princ_with_realm(context, slave_host, KPROP_SERVICE_NAME,
+                                 KRB5_NT_SRV_HST, realm, &creds.server);
     if (retval) {
         com_err(progname, errno, _("while setting server principal name"));
         (void) krb5_cc_destroy(context, ccache);
         exit(1);
-    }
-    if (realm) {
-        retval = krb5_set_principal_realm(context, creds.server, realm);
-        if (retval) {
-            com_err(progname, errno,
-                    _("while setting server principal realm"));
-            exit(1);
-        }
     }
 
     /*
