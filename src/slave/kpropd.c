@@ -1171,6 +1171,13 @@ parse_args(char **argv)
             com_err(progname, errno, _("while constructing my service realm"));
             exit(1);
         }
+        params.realm = strdup(realm);
+        if (params.realm == NULL) {
+            com_err(progname, ENOMEM, _("while constructing my service realm"));
+            exit(1);
+        }
+        def_realm = params.realm;
+        params.mask |= KADM5_CONFIG_REALM;
     }
 
     /* Construct the name of the temporary file. */
