@@ -254,6 +254,7 @@ testlog
 /src/tests/etinfo
 /src/tests/gcred
 /src/tests/hist
+/src/tests/hooks
 /src/tests/hrealm
 /src/tests/kdbtest
 /src/tests/kdc.conf
