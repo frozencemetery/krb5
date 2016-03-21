@@ -256,6 +256,7 @@ ipropx_resync(uint32_t vers, struct svc_req *rqstp)
     gss_name_t name = NULL;
     char *client_name = NULL, *service_name = NULL;
     char *whoami = "iprop_full_resync_1";
+    char *realmbuf = NULL;
 
     /*
      * vers contains the highest version number the client is
@@ -319,6 +320,15 @@ ipropx_resync(uint32_t vers, struct svc_req *rqstp)
 			 _("%s: getclhoststr failed"),
 			 whoami);
 	goto out;
+    }
+
+    if (handle->params.realm) {
+        if (asprintf(&realmbuf, "-r %s ", handle->params.realm) < 0) {
+            krb5_klog_syslog(LOG_ERR,
+                             _("%s: unable to construct kdb5_util realm option; out of memory"),
+                             whoami);
+            goto out;
+        }
     }
 
     /*
