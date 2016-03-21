@@ -640,6 +640,12 @@ do_iprop()
         }
     }
 
+    if (retval = krb5_set_default_realm(kpropd_context, def_realm)) {
+        com_err(progname, retval,
+                _("Unable to set default realm"));
+        exit(1);
+    }
+
     params.mask |= KADM5_CONFIG_REALM;
     params.realm = def_realm;
 
