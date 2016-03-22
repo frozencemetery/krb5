@@ -257,6 +257,9 @@ ipropx_resync(uint32_t vers, struct svc_req *rqstp)
     char *client_name = NULL, *service_name = NULL;
     char *whoami = "iprop_full_resync_1";
     char *realmbuf = NULL;
+    int ipp = 0;
+    kadm5_config_params params;
+    char portstr[6];
 
     /*
      * vers contains the highest version number the client is
@@ -400,13 +403,21 @@ ipropx_resync(uint32_t vers, struct svc_req *rqstp)
 	    _exit(1);
 	}
 
-	DPRINT("%s: exec `kprop -f %s %s' ...\n",
-		whoami, dump_file, clhost);
 	/* XXX Yuck!  */
-	if (getenv("KPROP_PORT")) {
-	    pret = execl(kprop, "kprop", "-f", dump_file, "-P",
-			 getenv("KPROP_PORT"), clhost, NULL);
+    if (getenv("KPROP_PORT"))
+        ipp = atoi(getenv("KPROP_PORT"));
+    else
+        if (!kadm5_get_config_params(handle->context, 1, NULL, &params))
+            ipp = params.iprop_port;
+
+    if (ipp != 0) {
+        snprintf(portstr, sizeof(portstr), "%i", ipp);
+        DPRINT(("%s: exec `kprop -f %s -P %s %s' ...\n", whoami, dump_file,
+                portstr, clhost));
+        pret = execl(kprop, "kprop", "-f", dump_file, "-P", portstr, clhost,
+                     NULL);
 	} else {
+        DPRINT("%s: exec `kprop -f %s %s' ...\n", whoami, dump_file, clhost);
 	    pret = execl(kprop, "kprop", "-f", dump_file, clhost, NULL);
 	}
 	perror(whoami);
