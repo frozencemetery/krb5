@@ -147,7 +147,7 @@ osa_adb_init_db(osa_adb_db_t *dbp, char *filename, char *lockfilename,
          * POSIX systems
          */
         lockp->lockinfo.filename = strdup(lockfilename);
-        if ((lockp->lockinfo.lockfile = fopen(lockfilename, "r+")) == NULL) {
+        if ((lockp->lockinfo.lockfile = WRITABLEFOPEN(lockfilename, "r+")) == NULL) {
             /*
              * maybe someone took away write permission so we could only
              * get shared locks?

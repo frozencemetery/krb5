@@ -61,6 +61,7 @@ HEADERS= \
 	gssapi_err_generic.h \
 	k5-int.h \
 	k5-int-pkinit.h \
+	k5-label.h \
 	k5-thread.h \
 	k5-platform.h \
 	k5-buf.h \
@@ -162,10 +163,12 @@ gssapi_generic.h: $(GSS_GENERIC)/gssapi_generic.h
 	$(CP) $(GSS_GENERIC)/gssapi_generic.h $@
 gssapi_err_generic.h: $(GSS_GENERIC_BUILD)/gssapi_err_generic.h
 	$(CP) $(GSS_GENERIC_BUILD)/gssapi_err_generic.h $@
-k5-int.h: $(INCLUDE)/k5-int.h
+k5-int.h: $(INCLUDE)/k5-int.h k5-label.h
 	$(CP) $(INCLUDE)/k5-int.h $@
 k5-int-pkinit.h: $(INCLUDE)/k5-int-pkinit.h
 	$(CP) $(INCLUDE)/k5-int-pkinit.h $@
+k5-label.h: $(INCLUDE)/k5-label.h
+	$(CP) $(INCLUDE)/k5-label.h $@
 k5-thread.h: $(INCLUDE)/k5-thread.h
 	$(CP) $(INCLUDE)/k5-thread.h $@
 k5-platform.h: $(INCLUDE)/k5-platform.h
