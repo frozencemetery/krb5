@@ -61,6 +61,8 @@
 
 #include <dirent.h>
 
+#define ROOT_SPECIAL_DCC_PARENT "/run/user/0"
+
 extern const krb5_cc_ops krb5_dcc_ops;
 extern const krb5_cc_ops krb5_fcc_ops;
 
@@ -237,6 +239,18 @@ verify_dir(krb5_context context, const char *dirname)
 
     if (stat(dirname, &st) < 0) {
         if (errno == ENOENT) {
+            if (strncmp(dirname, ROOT_SPECIAL_DCC_PARENT "/",
+                        sizeof(ROOT_SPECIAL_DCC_PARENT)) == 0 &&
+                stat(ROOT_SPECIAL_DCC_PARENT, &st) < 0 &&
+                errno == ENOENT) {
+#ifdef USE_SELINUX
+                selabel = krb5int_push_fscreatecon_for(ROOT_SPECIAL_DCC_PARENT);
+#endif
+                status = mkdir(ROOT_SPECIAL_DCC_PARENT, S_IRWXU);
+#ifdef USE_SELINUX
+                krb5int_pop_fscreatecon(selabel);
+#endif
+            }
 #ifdef USE_SELINUX
             selabel = krb5int_push_fscreatecon_for(dirname);
 #endif
