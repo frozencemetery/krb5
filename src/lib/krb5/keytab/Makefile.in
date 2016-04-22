@@ -12,6 +12,7 @@ STLIBOBJS= \
 	ktfr_entry.o	\
 	ktremove.o	\
 	ktfns.o		\
+	kt_any.o	\
 	kt_file.o	\
 	kt_memory.o	\
 	kt_srvtab.o	\
@@ -24,6 +25,7 @@ OBJS=	\
 	$(OUTPRE)ktfr_entry.$(OBJEXT)	\
 	$(OUTPRE)ktremove.$(OBJEXT)	\
 	$(OUTPRE)ktfns.$(OBJEXT)	\
+	$(OUTPRE)kt_any.$(OBJEXT)	\
 	$(OUTPRE)kt_file.$(OBJEXT)	\
 	$(OUTPRE)kt_memory.$(OBJEXT)	\
 	$(OUTPRE)kt_srvtab.$(OBJEXT)	\
@@ -36,6 +38,7 @@ SRCS=	\
 	$(srcdir)/ktfr_entry.c	\
 	$(srcdir)/ktremove.c	\
 	$(srcdir)/ktfns.c	\
+	$(srcdir)/kt_any.c	\
 	$(srcdir)/kt_file.c	\
 	$(srcdir)/kt_memory.c	\
 	$(srcdir)/kt_srvtab.c	\
