@@ -377,7 +377,7 @@ krb5_ktfile_get_entry(krb5_context context, krb5_keytab id,
              * Otherwise, remember that we were here so we can return the right
              * error, and free the new.
              */
-            if (new_entry.vno == kvno) {
+            if (new_entry.vno == kvno || new_entry.vno == IGNORE_VNO) {
                 krb5_kt_free_entry(context, &cur_entry);
                 cur_entry = new_entry;
                 if (new_entry.vno == kvno)
