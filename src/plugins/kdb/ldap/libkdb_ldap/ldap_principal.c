@@ -54,6 +54,9 @@ char     *principal_attributes[] = { "krbprincipalname",
                                      "krbLastFailedAuth",
                                      "krbLoginFailedCount",
                                      "krbLastSuccessfulAuth",
+#ifdef HAVE_DIRSRV_ACCOUNT_LOCKING
+                                     "nsAccountLock",
+#endif
                                      "krbLastPwdChange",
                                      "krbLastAdminUnlock",
                                      "krbPrincipalAuthInd",
