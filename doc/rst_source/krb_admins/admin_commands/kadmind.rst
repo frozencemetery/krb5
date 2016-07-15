@@ -6,7 +6,7 @@ kadmind
 SYNOPSIS
 -----------
        
-**kadmind** [**-x** *db_args*] [**-r** *realm*] [**-m**] [**-nofork**] [**-port** *port-number*] [**-P** *pid_file*]
+**kadmind** [**-x** *db_args*] [**-r** *realm*] [**-m**] [**-nofork**] [**-port** *port-number*] [**-P** *pid_file*] [**-k** *kprop_port*]
 
 DESCRIPTION
 -----------
@@ -86,6 +86,11 @@ OPTIONS
        **-P** *pid_file*
               specifies the file to which the PID of *kadmind* process should be written to after it starts up.  This can be used to identify
               whether *kadmind* is still running and to allow init scripts to stop the correct process.
+
+       **-k** *kprop_port*
+              specifies the port by which the kprop process that is spawned by kadmind
+              connects to the slave kpropd, in order to transfer the dump file during
+              an iprop full resync request.
 
 CONFIGURATION VALUES
 ---------------------------

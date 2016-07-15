@@ -35,6 +35,7 @@ extern gss_name_t rqst2name(struct svc_req *rqstp);
 extern void *global_server_handle;
 extern int nofork;
 extern short l_port;
+extern char *kprop_port;
 static char abuf[33];
 
 /* Result is stored in a static buffer and is invalidated by the next call. */
@@ -375,13 +376,11 @@ ipropx_resync(uint32_t vers, struct svc_req *rqstp)
 	    _exit(1);
 	}
 
-
 	DPRINT(("%s: exec `kprop -r %s -f %s %s' ...\n",
 		handle->params.realm, whoami, tmpf, clhost));
-	/* XXX Yuck!  */
-	if (getenv("KPROP_PORT"))
+	if (kprop_port != NULL)
             pret = execl(KPROPD_DEFAULT_KPROP, "kprop", "-r", handle->params.realm, "-f",
-                         tmpf, "-P", getenv("KPROP_PORT"),
+                         tmpf, "-P", kprop_port,
 			 clhost, NULL);
 	else
             pret = execl(KPROPD_DEFAULT_KPROP, "kprop", "-r", handle->params.realm, "-f",

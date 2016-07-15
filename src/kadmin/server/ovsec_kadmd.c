@@ -68,6 +68,7 @@ extern int daemon(int, int);
 gss_name_t gss_changepw_name = NULL, gss_oldchangepw_name = NULL;
 gss_name_t gss_kadmin_name = NULL;
 void *global_server_handle;
+char *kprop_port = NULL;
 
 extern krb5_keylist_node  *master_keylist;
 
@@ -109,7 +110,7 @@ static void usage()
 {
     fprintf(stderr, _("Usage: kadmind [-x db_args]* [-r realm] [-m] [-nofork] "
                       "[-port port-number]\n"
-                      "\t\t[-P pid_file]\n"
+                      "\t\t[-k kprop_port] [-P pid_file]\n"
                       "\nwhere,\n\t[-x db_args]* - any number of database "
                       "specific arguments.\n"
                       "\t\t\tLook at each database documentation for "
@@ -300,6 +301,11 @@ int main(int argc, char *argv[])
             pid_file = *argv;
         } else if (strcmp(*argv, "-W") == 0) {
             strong_random = 0;
+        } else if (strcmp(*argv, "-k") == 0) {
+            argc--; argv++;
+            if (!argc)
+                usage();
+            kprop_port = *argv;
         } else
             break;
         argc--; argv++;
@@ -638,6 +644,9 @@ kterr:
 #endif
     }
 
+    if (kprop_port == NULL)
+        kprop_port = getenv("KPROP_PORT");
+    
     krb5_klog_syslog(LOG_INFO, _("starting"));
     if (nofork)
         fprintf(stderr, _("%s: starting...\n"), whoami);

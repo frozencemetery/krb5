@@ -5,7 +5,7 @@ kadmind \- KADM5 administration server
 .B kadmind
 [\fB\-x\fP \fIdb_args\fP] [\fB-r\fP \fIrealm\fP] [\fB\-m\fP] [\fB\-nofork\fP] [\fB\-port\fP
 \fIport-number\fP]
-    [\fB\-P\fP \fIpid_file\fP]
+    [\fB\-P\fP \fIpid_file\fP] [\fB\-k\fP \fIkprop_port\fP]
 .SH DESCRIPTION
 This command starts the KADM5 administration server.  If the database is db2, 
 the administration server runs on the master Kerberos server, which stores the KDC
@@ -131,6 +131,11 @@ process should be written to after it starts up.  This can be used to
 identify whether
 .B kadmind
 is still running and to allow init scripts to stop the correct process.
+.TP
+\fB\-k\fP \fIkprop_port\fP
+specifies the port by which the kprop process that is spawned by kadmind
+connects to the slave kpropd, in order to transfer the dump file during an
+iprop full resync request.
 .SH CONFIGURATION VALUES
 .PP
 In addition to the relations defined in kdc.conf(5), kadmind
