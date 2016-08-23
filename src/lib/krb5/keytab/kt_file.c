@@ -1030,7 +1030,7 @@ krb5_ktfileint_open(krb5_context context, krb5_keytab id, int mode)
 
     KTCHECKLOCK(id);
     errno = 0;
-    KTFILEP(id) = fopen(KTFILENAME(id),
+    KTFILEP(id) = WRITABLEFOPEN(KTFILENAME(id),
                         (mode == KRB5_LOCKMODE_EXCLUSIVE) ?
                         fopen_mode_rbplus : fopen_mode_rb);
     if (!KTFILEP(id)) {
@@ -1038,7 +1038,7 @@ krb5_ktfileint_open(krb5_context context, krb5_keytab id, int mode)
             /* try making it first time around */
             k5_create_secure_file(context, KTFILENAME(id));
             errno = 0;
-            KTFILEP(id) = fopen(KTFILENAME(id), fopen_mode_rbplus);
+            KTFILEP(id) = WRITABLEFOPEN(KTFILENAME(id), fopen_mode_rbplus);
             if (!KTFILEP(id))
                 goto report_errno;
             writevno = 1;
