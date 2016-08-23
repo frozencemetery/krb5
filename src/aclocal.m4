@@ -1677,6 +1677,15 @@ if test "$with_ldap" = yes; then
   AC_MSG_NOTICE(enabling OpenLDAP database backend module support)
   OPENLDAP_PLUGIN=yes
 fi
+AC_ARG_WITH([dirsrv-account-locking],
+[  --with-dirsrv-account-locking       compile 389/Red Hat/Fedora/Netscape Directory Server database backend module],
+[case "$withval" in
+    yes | no) ;;
+    *)  AC_MSG_ERROR(Invalid option value --with-dirsrv-account-locking="$withval") ;;
+esac], with_dirsrv_account_locking=no)
+if test $with_dirsrv_account_locking = yes; then
+    AC_DEFINE(HAVE_DIRSRV_ACCOUNT_LOCKING,1,[Define if LDAP KDB interface should heed 389 DS's nsAccountLock attribute.])
+fi
 ])dnl
 dnl
 dnl If libkeyutils exists (on Linux) include it and use keyring ccache
