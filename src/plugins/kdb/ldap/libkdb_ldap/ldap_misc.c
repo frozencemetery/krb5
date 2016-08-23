@@ -1674,6 +1674,23 @@ populate_krb5_db_entry(krb5_context context, krb5_ldap_context *ldap_context,
     ret = krb5_dbe_update_tl_data(context, entry, &userinfo_tl_data);
     if (ret)
         goto cleanup;
+#ifdef HAVE_DIRSRV_ACCOUNT_LOCKING
+    {
+        krb5_timestamp              expiretime=0;
+        char                        *is_login_disabled=NULL;
+
+        /* LOGIN DISABLED */
+        ret = krb5_ldap_get_string(ld, ent, "nsAccountLock", &is_login_disabled,
+                                   &attr_present);
+        if (ret)
+            goto cleanup;
+        if (attr_present == TRUE) {
+            if (strcasecmp(is_login_disabled, "TRUE")== 0)
+                entry->attributes |= KRB5_KDB_DISALLOW_ALL_TIX;
+            free (is_login_disabled);
+        }
+    }
+#endif
 
     ret = krb5_read_tkt_policy(context, ldap_context, entry, tktpolname);
     if (ret)
