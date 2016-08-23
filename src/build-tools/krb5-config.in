@@ -226,6 +226,13 @@ if test -n "$do_libs"; then
 	    -e 's#\$(PTHREAD_CFLAGS)#'"$PTHREAD_CFLAGS"'#' \
 	    -e 's#\$(CFLAGS)##'`
 
+    if test `dirname $libdir` = /usr ; then
+        lib_flags=`echo $lib_flags | sed -e "s#-L$libdir##" -e "s#$RPATH_FLAG$libdir##"`
+    fi
+    lib_flags=`echo $lib_flags | sed -e "s#-fPIE##g" -e "s#-pie##g"`
+    lib_flags=`echo $lib_flags | sed -e "s#-Wl,-z,relro##g"`
+    lib_flags=`echo $lib_flags | sed -e "s#-Wl,-z,now##g"`
+
     if test $library = 'kdb'; then
 	lib_flags="$lib_flags -lkdb5 $KDB5_DB_LIB"
 	library=krb5
