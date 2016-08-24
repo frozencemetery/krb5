@@ -808,6 +808,6 @@ This module implements the encrypted challenge FAST factor.
 This module implements the encrypted timestamp mechanism.
 
 .SH FILES 
-/etc/krb5.conf
+@mansysconfdir@/krb5.conf
 .SH SEE ALSO
 syslog(3)

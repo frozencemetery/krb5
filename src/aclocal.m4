@@ -1743,3 +1743,24 @@ AC_SUBST(PAM_LIBS)
 AC_SUBST(PAM_MAN)
 AC_SUBST(NON_PAM_MAN)
 ])dnl
+AC_DEFUN(V5_AC_OUTPUT_MANPAGE,[
+mansysconfdir=$sysconfdir
+mansysconfdir=`eval echo $mansysconfdir | sed -e "s,NONE,$prefix,g"`
+mansysconfdir=`eval echo $mansysconfdir | sed -e "s,NONE,$ac_default_prefix,g"`
+mansbindir=$sbindir
+mansbindir=`eval echo $mansbindir | sed -e "s,NONE,$exec_prefix,g"`
+mansbindir=`eval echo $mansbindir | sed -e "s,NONE,$prefix,g"`
+mansbindir=`eval echo $mansbindir | sed -e "s,NONE,$ac_default_prefix,g"`
+manlocalstatedir=$localstatedir
+manlocalstatedir=`eval echo $manlocalstatedir | sed -e "s,NONE,$prefix,g"`
+manlocalstatedir=`eval echo $manlocalstatedir | sed -e "s,NONE,$ac_default_prefix,g"`
+manlibexecdir=$libexecdir
+manlibexecdir=`eval echo $manlibexecdir | sed -e "s,NONE,$exec_prefix,g"`
+manlibexecdir=`eval echo $manlibexecdir | sed -e "s,NONE,$prefix,g"`
+manlibexecdir=`eval echo $manlibexecdir | sed -e "s,NONE,$ac_default_prefix,g"`
+AC_SUBST(mansysconfdir)
+AC_SUBST(mansbindir)
+AC_SUBST(manlocalstatedir)
+AC_SUBST(manlibexecdir)
+AC_CONFIG_FILES($1)
+])

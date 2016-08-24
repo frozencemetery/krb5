@@ -125,7 +125,7 @@ default is /etc/krb5.conf.
 Specifies the location of the KDC configuration file, which contains
 additional configuration directives for the Key Distribution Center
 daemon and associated programs.  The default is
-/usr/local/var/krb5kdc/kdc.conf.
+@manlocalstatedir@/krb5kdc/kdc.conf.
 .TP
 .B KRB5RCACHETYPE
 Specifies the default type of replay cache to use for servers.  Valid

@@ -59,7 +59,7 @@ option allows for a different keytab than the default.
 using a line in
 /etc/inetd.conf that looks like this:
 .PP
-sample  stream  tcp     nowait  root /usr/local/sbin/sserver	sserver
+sample  stream  tcp     nowait  root @mansbindir@/sserver	sserver
 .PP
 Since \fBsample\fP is normally not a port defined in /etc/services, you will
 usually have to add a line to /etc/services which looks like this:

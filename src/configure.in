@@ -1249,6 +1249,17 @@ fi
 AC_SUBST(localedir)
 
 AC_CONFIG_FILES(krb5-config, [chmod +x krb5-config])
+
+V5_AC_OUTPUT_MANPAGE([
+	appl/sample/sserver/sserver.M
+	config-files/kdc.conf.M
+	config-files/krb5.conf.M
+	gen-manpages/kerberos.M
+	kadmin/cli/kadmin.M
+	slave/kpropd.M
+	slave/kprop.M
+])
+
 V5_AC_OUTPUT_MAKEFILE(.
 
 	util util/support util/profile util/profile/testmod util/send-pr
