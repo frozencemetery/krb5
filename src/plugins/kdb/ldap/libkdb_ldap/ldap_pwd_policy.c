@@ -260,10 +260,10 @@ krb5_ldap_get_password_policy_from_dn(krb5_context context, char *pol_name,
     (*policy)->version = 1;
 #endif /**************** END IFDEF'ed OUT *******************************/
 
-    ent=ldap_first_entry(ld, result);
-    if (ent != NULL) {
-        if ((st = populate_policy(context, ld, ent, pol_name, *policy)) != 0)
-            goto cleanup;
+    ent=ldap_first_entry(ld, result);  
+    if (ent == NULL) {
+        st = KRB5_KDB_NOENTRY;
+        goto cleanup;
 #if 0 /************** Begin IFDEF'ed OUT *******************************/
         krb5_ldap_get_value(ld, ent, "krbmaxpwdlife", &((*policy)->pw_max_life));
         krb5_ldap_get_value(ld, ent, "krbminpwdlife", &((*policy)->pw_min_life));
@@ -279,6 +279,7 @@ krb5_ldap_get_password_policy_from_dn(krb5_context context, char *pol_name,
                                             ld);
 #endif /**************** END IFDEF'ed OUT *******************************/
     }
+    st = populate_policy(context, ld, ent, pol_name, *policy);
 
 cleanup:
     ldap_msgfree(result);
