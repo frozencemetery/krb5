@@ -346,7 +346,7 @@ void update_ok_file (file_name)
         exit_status++;
         return;
     }
-    if ((fd = open(file_ok, O_WRONLY|O_CREAT|O_TRUNC, 0600)) < 0) {
+    if ((fd = THREEPARAMOPEN(file_ok, O_WRONLY|O_CREAT|O_TRUNC, 0600)) < 0) {
         com_err(progname, errno, _("while creating 'ok' file, '%s'"),
                 file_ok);
         exit_status++;
@@ -1251,7 +1251,7 @@ dump_db(argc, argv)
          * want to get into.
          */
         unlink(ofile);
-        if (!(f = fopen(ofile, "w"))) {
+        if (!(f = WRITABLEFOPEN(ofile, "w"))) {
             fprintf(stderr, ofopen_error,
                     progname, ofile, error_message(errno));
             exit_status++;

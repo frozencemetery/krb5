@@ -336,7 +336,7 @@ retry:
     if (!debug && iproprole != IPROP_SLAVE)
         daemon(1, 0);
 #ifdef PID_FILE
-    if ((pidfile = fopen(PID_FILE, "w")) != NULL) {
+    if ((pidfile = WRITABLEFOPEN(PID_FILE, "w")) != NULL) {
         fprintf(pidfile, "%d\n", getpid());
         fclose(pidfile);
     } else
@@ -437,6 +437,9 @@ void doit(fd)
     krb5_enctype etype;
     int database_fd;
     char host[INET6_ADDRSTRLEN+1];
+#ifdef USE_SELINUX
+    void *selabel;
+#endif
 
     if (kpropd_context->kdblog_context &&
         kpropd_context->kdblog_context->iproprole == IPROP_SLAVE) {
@@ -515,9 +518,15 @@ void doit(fd)
         free(name);
         exit(1);
     }
+#ifdef USE_SELINUX
+    selabel = krb5int_push_fscreatecon_for(file);
+#endif
     omask = umask(077);
     lock_fd = open(temp_file_name, O_RDWR|O_CREAT, 0600);
     (void) umask(omask);
+#ifdef USE_SELINUX
+    krb5int_pop_fscreatecon(selabel);
+#endif
     retval = krb5_lock_file(kpropd_context, lock_fd,
                             KRB5_LOCKMODE_EXCLUSIVE|KRB5_LOCKMODE_DONTBLOCK);
     if (retval) {

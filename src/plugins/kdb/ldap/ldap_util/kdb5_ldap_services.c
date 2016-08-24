@@ -1088,7 +1088,7 @@ rem_service_entry_from_file(int argc, char *argv[], char *file_name,
 
     /* Create a temporary file which contains all the entries except the
        entry for the given service dn */
-    pfile = fopen(file_name, "r+");
+    pfile = WRITABLEFOPEN(file_name, "r+");
     if (pfile == NULL) {
         com_err(me, errno, "while deleting entry from file %s", file_name);
         goto cleanup;
@@ -1105,7 +1105,7 @@ rem_service_entry_from_file(int argc, char *argv[], char *file_name,
     snprintf (tmp_file, strlen(file_name) + 4 + 1, "%s%s", file_name, ".tmp");
 
 
-    tmpfd = creat(tmp_file, S_IRUSR|S_IWUSR);
+    tmpfd = THREEPARAMOPEN(tmp_file, O_CREAT|O_WRONLY|O_TRUNC, S_IRUSR|S_IWUSR);
     umask(omask);
     if (tmpfd == -1) {
         com_err(me, errno, "while deleting entry from file\n");
@@ -1725,7 +1725,7 @@ kdb5_ldap_set_service_password(int argc, char **argv)
 
             printf("File does not exist. Creating the file %s...\n", file_name);
             omask = umask(077);
-            fd = creat(file_name, S_IRUSR|S_IWUSR);
+            fd = THREEPARAMOPEN(file_name, O_CREAT|O_WRONLY|O_TRUNC, S_IRUSR|S_IWUSR);
             umask(omask);
             if (fd == -1) {
                 com_err(me, errno, "Error creating file %s", file_name);
@@ -1753,7 +1753,7 @@ kdb5_ldap_set_service_password(int argc, char **argv)
 
     /* TODO: file lock for the service password file */
     /* set password in the file */
-    pfile = fopen(file_name, "r+");
+    pfile = WRITABLEFOPEN(file_name, "r+");
     if (pfile == NULL) {
         com_err(me, errno, "Failed to open file %s", file_name);
         goto cleanup;
@@ -1794,7 +1794,7 @@ kdb5_ldap_set_service_password(int argc, char **argv)
         }
 
         omask = umask(077);
-        newfile = fopen(tmp_file, "w+");
+        newfile = WRITABLEFOPEN(tmp_file, "w+");
         umask(omask);
         if (newfile == NULL) {
             com_err(me, errno, "Error creating file %s", tmp_file);
@@ -2016,7 +2016,7 @@ done:
 
     /* set password in the file */
     old_mode = umask(0177);
-    pfile = fopen(file_name, "a+");
+    pfile = WRITABLEFOPEN(file_name, "a+");
     if (pfile == NULL) {
         com_err(me, errno, _("Failed to open file %s: %s"), file_name,
                 strerror (errno));
@@ -2068,7 +2068,7 @@ done:
         }
 
         omask = umask(077);
-        newfile = fopen(tmp_file, "w");
+        newfile = WRITABLEFOPEN(tmp_file, "w");
         umask (omask);
         if (newfile == NULL) {
             com_err(me, errno, _("Error creating file %s"), tmp_file);

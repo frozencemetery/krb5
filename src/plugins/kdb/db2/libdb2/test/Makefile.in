@@ -12,7 +12,8 @@ PROG_RPATH=$(KRB5_LIBDIR)
 
 KRB5_RUN_ENV= @KRB5_RUN_ENV@
 
-DB_LIB		= -ldb
+DB_LIB		= -ldb $(SUPPORT_DEPLIB)
+
 DB_DEPLIB	= ../libdb$(DEPLIBEXT)
 
 all::

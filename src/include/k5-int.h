@@ -134,6 +134,7 @@ typedef unsigned char   u_char;
 typedef UINT64_TYPE krb5_ui_8;
 typedef INT64_TYPE krb5_int64;
 
+#include "k5-label.h"
 
 #define DEFAULT_PWD_STRING1 "Enter password"
 #define DEFAULT_PWD_STRING2 "Re-enter password for verification"
