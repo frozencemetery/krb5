@@ -1187,6 +1187,11 @@ void PRS(argv)
                     _("while constructing my service realm"));
             exit(1);
         }
+	params.realm = strdup(realm);
+	if (params.realm) {
+	    def_realm = params.realm;
+	    params.mask |= KADM5_CONFIG_REALM;
+	}
     }
     /*
      * Construct the name of the temporary file.
