@@ -376,7 +376,7 @@ krb5_ktfile_get_entry(krb5_context context, krb5_keytab id,
                higher than that.  Short-term workaround: only compare
                the low 8 bits.  */
 
-            if (new_entry.vno == (kvno & 0xff)) {
+            if (new_entry.vno == (kvno & 0xff) || new_entry.vno == IGNORE_VNO) {
                 krb5_kt_free_entry(context, &cur_entry);
                 cur_entry = new_entry;
                 break;
