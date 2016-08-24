@@ -427,3 +427,6 @@ EXPORTS
 
 ; New for 1.10.3 / KfW 4.0
 	krb5int_cc_user_set_default_name		@404 ; PRIVATE LEASH
+
+; Hello!  I'm a backport
+	krb5_rd_req_decoded				@425 ; PRIVATE GSSAPI
