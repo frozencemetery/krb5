@@ -148,3 +148,4 @@ krb5_gss_dbg_client_expcreds
 krb5_gss_register_acceptor_identity
 krb5_gss_use_kdc_context
 gss_inquire_name
+gssint_g_order_init
