@@ -194,6 +194,13 @@ krb5_verify_init_creds(krb5_context context,
         authcon = NULL;
     }
 
+    /* Build an auth context that won't bother with replay checks -- it's
+     * not as if we're going to mount a replay attack on ourselves here. */
+    if (ret = krb5_auth_con_init(context, &authcon))
+        goto cleanup;
+    if (ret = krb5_auth_con_setflags(context, authcon, 0))
+        goto cleanup;
+
     /* verify the ap_req */
 
     if ((ret = krb5_rd_req(context, &authcon, &ap_req, server, keytab,
