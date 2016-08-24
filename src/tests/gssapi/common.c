@@ -85,6 +85,29 @@ errout(const char *msg)
     exit(1);
 }
 
+gss_name_t
+import_name(const char *str)
+{
+    OM_uint32 major, minor;
+    gss_name_t name;
+    gss_buffer_desc buf;
+    gss_OID nametype = NULL;
+
+    if (*str == 'u')
+        nametype = GSS_C_NT_USER_NAME;
+    else if (*str == 'p')
+        nametype = (gss_OID)GSS_KRB5_NT_PRINCIPAL_NAME;
+    else if (*str == 'h')
+        nametype = GSS_C_NT_HOSTBASED_SERVICE;
+    if (nametype == NULL || str[1] != ':')
+        errout("names must begin with u: or p: or h:");
+    buf.value = (char *)str + 2;
+    buf.length = strlen(str) - 2;
+    major = gss_import_name(&minor, &buf, nametype, &name);
+    check_gsserr("gss_import_name", major, minor);
+    return name;
+}
+
 void
 display_canon_name(const char *tag, gss_name_t name, gss_OID mech)
 {
