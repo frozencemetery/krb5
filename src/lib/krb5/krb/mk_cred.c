@@ -48,7 +48,7 @@ encrypt_credencpart(krb5_context context, krb5_cred_enc_part *pcredpart,
                                     KRB5_KEYUSAGE_KRB_CRED_ENCPART,
                                     scratch, pencdata);
 
-    if (retval) {
+    if (retval && pencdata->ciphertext.data) {
         memset(pencdata->ciphertext.data, 0, pencdata->ciphertext.length);
         free(pencdata->ciphertext.data);
         pencdata->ciphertext.length = 0;
