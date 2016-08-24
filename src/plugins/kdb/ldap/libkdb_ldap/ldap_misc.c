@@ -1841,6 +1841,7 @@ populate_krb5_db_entry(krb5_context context, krb5_ldap_context *ldap_context,
     krb5_tl_data    userinfo_tl_data = {0};
     char            **link_references = NULL;
     char *DN = NULL;
+    int val = 0;
 
     if (princ == NULL) {
         /* XXX WAF probably should just extract princ from ldap result */
@@ -1913,17 +1914,22 @@ populate_krb5_db_entry(krb5_context context, krb5_ldap_context *ldap_context,
         mask |= KDB_FAIL_AUTH_COUNT_ATTR;
 
     /* KRBMAXTICKETLIFE */
-    if (krb5_ldap_get_value(ld, ent, "krbmaxticketlife", &(entry->max_life)) == 0)
+    if (krb5_ldap_get_value(ld, ent, "krbmaxticketlife", &val) == 0) {
+        entry->max_life = val;
         mask |= KDB_MAX_LIFE_ATTR;
+    }
 
     /* KRBMAXRENEWABLEAGE */
-    if (krb5_ldap_get_value(ld, ent, "krbmaxrenewableage",
-                            &(entry->max_renewable_life)) == 0)
+    if (krb5_ldap_get_value(ld, ent, "krbmaxrenewableage", &val) == 0) {
+        entry->max_renewable_life = val;
         mask |= KDB_MAX_RLIFE_ATTR;
+    }
 
     /* KRBTICKETFLAGS */
-    if (krb5_ldap_get_value(ld, ent, "krbticketflags", &(entry->attributes)) == 0)
+    if (krb5_ldap_get_value(ld, ent, "krbticketflags", &val) == 0) {
+        entry->attributes = val;
         mask |= KDB_TKT_FLAGS_ATTR;
+    }
 
     /* PRINCIPAL EXPIRATION TIME */
     if ((st=krb5_ldap_get_time(ld, ent, "krbprincipalexpiration", &(entry->expiration),
