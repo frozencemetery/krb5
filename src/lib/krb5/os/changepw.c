@@ -274,10 +274,22 @@ change_set_password(krb5_context context,
                          &callback_info, &chpw_rep, ss2sa(&remote_addr),
                          &addrlen, NULL, NULL, NULL);
         if (code) {
-            /*
-             * Here we may want to switch to TCP on some errors.
-             * right?
-             */
+            /* if we're not using a stream socket, and it's an error which
+             * might reasonably be specific to a datagram "connection", try
+             * again with a stream socket */
+            if (!use_tcp) {
+                switch (code) {
+                case KRB5_KDC_UNREACH:
+                case KRB5_REALM_CANT_RESOLVE:
+                case KRB5KRB_ERR_RESPONSE_TOO_BIG:
+                /* should we do this for more result codes than these? */
+                    k5_free_serverlist (&sl);
+                    use_tcp = 1;
+                    continue;
+                default:
+                    break;
+                }
+            }
             break;
         }
 
