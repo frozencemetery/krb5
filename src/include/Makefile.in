@@ -67,6 +67,8 @@ PROCESS_REPLACE = -e "s+@KRB5RCTMPDIR+$(KRB5RCTMPDIR)+" \
 		  -e "s+@GSSMODULEDIR+$(GSS_MODULE_DIR)+" \
 		  -e 's+@LOCALSTATEDIR+$(LOCALSTATEDIR)+' \
 		  -e 's+@SYSCONFDIR+$(SYSCONFDIR)+' \
+		  -e 's+:/etc/krb5.conf:/etc/krb5.conf"+:/etc/krb5.conf"+' \
+		  -e 's+"/etc/krb5.conf:/etc/krb5.conf"+"/etc/krb5.conf"+' \
 		  -e 's+@DYNOBJEXT+$(DYNOBJEXT)+'
 
 OSCONFSRC = $(srcdir)/osconf.hin
