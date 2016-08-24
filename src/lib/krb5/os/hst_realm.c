@@ -35,6 +35,8 @@
  * krb5_free_host_realm()
  */
 
+/* We need to have EAI_NODATA and friends declared. */
+#define _GNU_SOURCE
 
 /*
   Figures out the Kerberos realm names for host, filling in a

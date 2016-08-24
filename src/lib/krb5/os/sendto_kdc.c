@@ -27,6 +27,9 @@
 /* Send packet to KDC for realm; wait for response, retransmitting
  * as necessary. */
 
+/* We need to have EAI_NODATA and friends declared. */
+#define _GNU_SOURCE
+
 #include "fake-addrinfo.h"
 #include "k5-int.h"
 

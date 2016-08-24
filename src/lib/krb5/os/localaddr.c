@@ -33,6 +33,9 @@
  * XNS support is untested, but "Should just work".  (Hah!)
  */
 
+/* We need to have EAI_NODATA and friends declared. */
+#define _GNU_SOURCE
+
 #include "k5-int.h"
 
 #if !defined(_WIN32)

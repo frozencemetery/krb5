@@ -101,6 +101,9 @@
  *   these functions, and throw all this away.  Pleeease?  :-)
  */
 
+/* We need to have EAI_NODATA and friends declared. */
+#define _GNU_SOURCE
+
 #include "port-sockets.h"
 #include "socket-utils.h"
 #include "k5-platform.h"
