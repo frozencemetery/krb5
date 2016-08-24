@@ -3672,6 +3672,9 @@ pkinit_login(krb5_context context,
     if (tip->flags & CKF_PROTECTED_AUTHENTICATION_PATH) {
         rdat.data = NULL;
         rdat.length = 0;
+    } else if (id_cryptoctx->prompter == NULL) {
+        r = KRB5_LIBOS_CANTREADPWD;
+        rdat.data = NULL;
     } else {
         if (tip->flags & CKF_USER_PIN_LOCKED)
             warning = " (Warning: PIN locked)";
@@ -4233,6 +4236,9 @@ pkinit_get_certs_pkcs12(krb5_context context,
         char *prompt_prefix = _("Pass phrase for");
 
         pkiDebug("Initial PKCS12_parse with no password failed\n");
+
+        if (id_cryptoctx->prompter == NULL)
+            goto cleanup;
 
         memset(prompt_reply, '\0', sizeof(prompt_reply));
         rdat.data = prompt_reply;
