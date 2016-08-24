@@ -211,6 +211,14 @@
               "enctype {etype}) with result: {kerr}", princ, keytab,    \
               (int) vno, enctype, err))
 
+#define TRACE_LOCALAUTH_INIT_CONFLICT(c, type, oldname, newname)        \
+    TRACE(c, (c, "Ignoring localauth module {str} because it conflicts "    \
+          "with an2ln type {str} from module {str}", newname, type, oldname))
+#define TRACE_LOCALAUTH_VTINIT_FAIL(c, ret)                             \
+    TRACE(c, (c, "localauth module failed to init vtable: {kerr}", ret))
+#define TRACE_LOCALAUTH_INIT_FAIL(c, name, ret)                         \
+    TRACE(c, (c, "localauth module {str} failed to init: {kerr}", name, ret))
+
 #define TRACE_MK_REP(c, ctime, cusec, subkey, seqnum)                   \
     TRACE(c, (c, "Creating AP-REP, time {long}.{int}, subkey {keyblock}, " \
               "seqnum {int}", (long) ctime, (int) cusec, subkey, (int) seqnum))

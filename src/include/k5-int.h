@@ -1392,7 +1392,8 @@ struct plugin_interface {
 #define PLUGIN_INTERFACE_CLPREAUTH   2
 #define PLUGIN_INTERFACE_KDCPREAUTH  3
 #define PLUGIN_INTERFACE_CCSELECT    4
-#define PLUGIN_NUM_INTERFACES        5
+#define PLUGIN_INTERFACE_LOCALAUTH   5
+#define PLUGIN_NUM_INTERFACES        6
 
 /* Retrieve the plugin module of type interface_id and name modname,
  * storing the result into module. */
@@ -1433,6 +1434,7 @@ typedef struct _kdb5_dal_handle kdb5_dal_handle;
 struct _kdb_log_context;
 typedef struct krb5_preauth_context_st krb5_preauth_context;
 struct ccselect_module_handle;
+struct localauth_module_handle;
 struct _krb5_context {
     krb5_magic      magic;
     krb5_enctype    *in_tkt_etypes;
@@ -1475,6 +1477,9 @@ struct _krb5_context {
 
     /* cache module stuff */
     struct ccselect_module_handle **ccselect_handles;
+
+    /* localauth module stuff */
+    struct localauth_module_handle **localauth_handles;
 
     /* error detail info */
     struct errinfo err;
@@ -2791,6 +2796,28 @@ k5alloc(size_t len, krb5_error_code *code)
     /* Allocate at least one byte since zero-byte allocs may return NULL. */
     ptr = calloc((len > 0) ? len : 1, 1);
     *code = (ptr == NULL) ? ENOMEM : 0;
+    return ptr;
+}
+
+/* Return a copy of the len bytes of memory at in; set *code to 0 or ENOMEM. */
+static inline void *
+k5memdup(const void *in, size_t len, krb5_error_code *code)
+{
+    void *ptr = k5alloc(len, code);
+
+    if (ptr != NULL)
+        memcpy(ptr, in, len);
+    return ptr;
+}
+
+/* Like k5memdup, but add a final null byte. */
+static inline void *
+k5memdup0(const void *in, size_t len, krb5_error_code *code)
+{
+    void *ptr = k5alloc(len + 1, code);
+
+    if (ptr != NULL)
+        memcpy(ptr, in, len);
     return ptr;
 }
 
