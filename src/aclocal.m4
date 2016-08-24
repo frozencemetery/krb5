@@ -1651,6 +1651,12 @@ AC_ARG_WITH([edirectory],
     yes | no) ;;
     *)  AC_MSG_ERROR(Invalid option value --with-edirectory="$withval") ;;
 esac], with_edirectory=no)dnl
+AC_ARG_WITH([dirsrv],
+[  --with-dirsrv       compile 389/Red Hat/Fedora/Netscape Directory Server database backend module],
+[case "$withval" in
+    yes | no) ;;
+    *)  AC_MSG_ERROR(Invalid option value --with-dirsrv="$withval") ;;
+esac], with_dirsrv=no)dnl
 
 if test $with_ldap = yes; then
   if test $with_edirectory = yes; then
@@ -1662,6 +1668,10 @@ elif test $with_edirectory = yes; then
   AC_MSG_NOTICE(enabling eDirectory database backend module support)
   OPENLDAP_PLUGIN=yes
   AC_DEFINE(HAVE_EDIRECTORY,1,[Define if LDAP KDB interface should assume eDirectory.])
+elif test $with_dirsrv = yes; then
+  AC_MSG_NOTICE(enabling 389/Red Hat/Fedora/Netscape Directory Server database backend module support)
+  OPENLDAP_PLUGIN=yes
+  AC_DEFINE(HAVE_DIRSRV,1,[Define if LDAP KDB interface should assume RHDS/FDS/NDS.])
 else
   : # neither enabled
 dnl  AC_MSG_NOTICE(disabling ldap backend module support)

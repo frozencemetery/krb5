@@ -58,6 +58,9 @@ char     *principal_attributes[] = { "krbprincipalname",
                                      "loginexpirationtime",
                                      "logindisabled",
 #endif
+#ifdef HAVE_DIRSRV
+                                     "nsaccountlock",
+#endif
                                      "krbLastPwdChange",
                                      "krbLastAdminUnlock",
                                      "krbExtraData",
