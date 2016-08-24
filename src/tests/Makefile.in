@@ -81,3 +81,4 @@ check-pytests:: hist
 clean::
 	$(RM) kdc.conf
 	$(RM) -rf kdc_realm/sandbox
+	$(RUNPYTEST) $(srcdir)/t_changepw.py $(PYTESTFLAGS)
