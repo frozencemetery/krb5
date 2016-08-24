@@ -240,6 +240,7 @@ ipropx_resync(uint32_t vers, struct svc_req *rqstp)
     static kdb_fullresync_result_t ret;
     char *tmpf = 0;
     char *ubuf = 0;
+    char *realmbuf = 0;
     char clhost[MAXHOSTNAMELEN] = {0};
     int pret, fret;
     kadm5_server_handle_t handle = global_server_handle;
@@ -324,14 +325,24 @@ ipropx_resync(uint32_t vers, struct svc_req *rqstp)
 	goto out;
     }
 
+    if (handle->params.realm) {
+	if (asprintf(&realmbuf, "-r %s ", handle->params.realm) < 0) {
+	    krb5_klog_syslog(LOG_ERR,
+			     _("%s: unable to construct kdb5_util realm option; out of memory"),
+			     whoami);
+	    goto out;
+	}
+    }
+
     /*
      * note the -i; modified version of kdb5_util dump format
      * to include sno (serial number). This argument is now
      * versioned (-i0 for legacy dump format, -i1 for ipropx
      * version 1 format, etc)
      */
-    if (asprintf(&ubuf, "%s dump -i%d %s </dev/null 2>&1",
-		 KPROPD_DEFAULT_KDB5_UTIL, vers, tmpf) < 0) {
+    if (asprintf(&ubuf, "%s %sdump -i%d %s </dev/null 2>&1",
+		 KPROPD_DEFAULT_KDB5_UTIL, (realmbuf) ? realmbuf : "", vers,
+		 tmpf) < 0) {
 	krb5_klog_syslog(LOG_ERR,
 			 _("%s: cannot construct kdb5 util dump string too long; out of memory"),
 			 whoami);
