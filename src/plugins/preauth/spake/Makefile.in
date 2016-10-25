@@ -21,11 +21,11 @@ SRCS= $(srcdir)/groups.c $(srcdir)/spake_client.c $(srcdir)/spake_kdc.c \
 t_vectors: t_vectors.o $(STLIBOBJS) $(SHLIB_EXPDEPS)
 	$(CC_LINK) -o $@ t_vectors.o $(STLIBOBJS) $(SHLIB_EXPLIBS)
 
-all-unix:: all-liblinks
-install-unix:: install-libs
+all-unix: all-liblinks
+install-unix: install-libs
 clean-unix:: clean-liblinks clean-libs clean-libobjs
 
-check-unix:: t_vectors
+check-unix: t_vectors
 	$(RUN_TEST_LOCAL_CONF) ./t_vectors
 
 @libnover_frag@
