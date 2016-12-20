@@ -1198,7 +1198,7 @@ k5_plugin_free_context(krb5_context context);
 struct _kdb5_dal_handle;        /* private, in kdb5.h */
 typedef struct _kdb5_dal_handle kdb5_dal_handle;
 struct _kdb_log_context;
-typedef struct krb5_preauth_context_st krb5_preauth_context;
+typedef struct krb5_preauth_context_st *krb5_preauth_context;
 struct ccselect_module_handle;
 struct localauth_module_handle;
 struct hostrealm_module_handle;
@@ -1235,7 +1235,7 @@ struct _krb5_context {
     struct plugin_dir_handle libkrb5_plugins;
 
     /* preauth module stuff */
-    krb5_preauth_context *preauth_context;
+    krb5_preauth_context preauth_context;
 
     /* cache module stuff */
     struct ccselect_module_handle **ccselect_handles;
