@@ -24,4 +24,17 @@ out = realm.run([kinit, realm.user_princ], input=password('user')+'\n')
 if '2rt: secondtrip' not in out:
     fail('multi round-trip cookie test')
 
+# Test that multiple stepwise initial creds operations can be
+# performed with the same krb5_context, with proper tracking of
+# clpreauth module request handles.
+realm.run([kadminl, 'addprinc', '-pw', 'pw', 'u1'])
+realm.run([kadminl, 'addprinc', '+requires_preauth', '-pw', 'pw', 'u2'])
+realm.run([kadminl, 'addprinc', '+requires_preauth', '-pw', 'pw', 'u3'])
+realm.run([kadminl, 'setstr', 'u2', '2rt', 'extra'])
+out = realm.run(['./icinterleave', 'pw', 'u1', 'u2', 'u3'])
+if out != ('step 1\nstep 2\nstep 3\nstep 1\nfinish 1\nstep 2\nno attr\n'
+           'step 3\nno attr\nstep 2\n2rt: extra\nstep 3\nfinish 3\nstep 2\n'
+           'finish 2\n'):
+    fail('unexpected output from icinterleave')
+
 success('Pre-authentication framework tests')
