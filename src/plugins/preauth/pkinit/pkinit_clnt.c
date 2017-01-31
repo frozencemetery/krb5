@@ -231,6 +231,8 @@ pkinit_as_req_create(krb5_context context,
         auth_pack.pkAuthenticator.cusec = cusec;
         auth_pack.pkAuthenticator.nonce = nonce;
         auth_pack.pkAuthenticator.paChecksum = *cksum;
+        if (!reqctx->opts->disable_freshness)
+            auth_pack.pkAuthenticator.freshnessToken = reqctx->freshness_token;
         auth_pack.clientDHNonce.length = 0;
         auth_pack.clientPublicValue = &info;
         auth_pack.supportedKDFs = (krb5_data **)supported_kdf_alg_ids;
@@ -1162,6 +1164,7 @@ pkinit_client_process(krb5_context context, krb5_clpreauth_moddata moddata,
     pkinit_context plgctx = (pkinit_context)moddata;
     pkinit_req_context reqctx = (pkinit_req_context)modreq;
     krb5_keyblock as_key;
+    krb5_data d;
 
     pkiDebug("pkinit_client_process %p %p %p %p\n",
              context, plgctx, reqctx, request);
@@ -1174,6 +1177,12 @@ pkinit_client_process(krb5_context context, krb5_clpreauth_moddata moddata,
     case KRB5_PADATA_PKINIT_KX:
         reqctx->rfc6112_kdc = 1;
         return 0;
+    case KRB5_PADATA_AS_FRESHNESS:
+        TRACE_PKINIT_CLIENT_FRESHNESS_TOKEN(context);
+        krb5_free_data(context, reqctx->freshness_token);
+        reqctx->freshness_token = NULL;
+        d = make_data(in_padata->contents, in_padata->length);
+        return krb5_copy_data(context, &d, &reqctx->freshness_token);
     case KRB5_PADATA_PK_AS_REQ:
         reqctx->rfc4556_kdc = 1;
         pkiDebug("processing KRB5_PADATA_PK_AS_REQ\n");
@@ -1359,7 +1368,7 @@ cleanup:
 static int
 pkinit_client_get_flags(krb5_context kcontext, krb5_preauthtype patype)
 {
-    if (patype == KRB5_PADATA_PKINIT_KX)
+    if (patype == KRB5_PADATA_PKINIT_KX || patype == KRB5_PADATA_AS_FRESHNESS)
         return PA_INFO;
     return PA_REAL;
 }
@@ -1376,6 +1385,7 @@ static krb5_preauthtype supported_client_pa_types[] = {
     KRB5_PADATA_PK_AS_REP_OLD,
     KRB5_PADATA_PK_AS_REQ_OLD,
     KRB5_PADATA_PKINIT_KX,
+    KRB5_PADATA_AS_FRESHNESS,
     0
 };
 
@@ -1400,6 +1410,7 @@ pkinit_client_req_init(krb5_context context,
     reqctx->opts = NULL;
     reqctx->idctx = NULL;
     reqctx->idopts = NULL;
+    reqctx->freshness_token = NULL;
 
     retval = pkinit_init_req_opts(&reqctx->opts);
     if (retval)
@@ -1410,6 +1421,7 @@ pkinit_client_req_init(krb5_context context,
     reqctx->opts->dh_or_rsa = plgctx->opts->dh_or_rsa;
     reqctx->opts->allow_upn = plgctx->opts->allow_upn;
     reqctx->opts->require_crl_checking = plgctx->opts->require_crl_checking;
+    reqctx->opts->disable_freshness = plgctx->opts->disable_freshness;
 
     retval = pkinit_init_req_crypto(&reqctx->cryptoctx);
     if (retval)
@@ -1467,6 +1479,8 @@ pkinit_client_req_fini(krb5_context context, krb5_clpreauth_moddata moddata,
 
     if (reqctx->idopts != NULL)
         pkinit_fini_identity_opts(reqctx->idopts);
+
+    krb5_free_data(context, reqctx->freshness_token);
 
     free(reqctx);
     return;
@@ -1580,6 +1594,9 @@ handle_gic_opt(krb5_context context,
             pkiDebug("Setting flag to use RSA_PROTOCOL\n");
             plgctx->opts->dh_or_rsa = RSA_PROTOCOL;
         }
+    } else if (strcmp(attr, "disable_freshness") == 0) {
+        if (strcmp(value, "yes") == 0)
+            plgctx->opts->disable_freshness = 1;
     }
     return 0;
 }
