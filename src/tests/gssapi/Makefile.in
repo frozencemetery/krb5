@@ -46,6 +46,7 @@ check-pytests: ccinit ccrefresh t_accname t_ccselect t_ciflags t_credstore \
 	t_inq_ctx t_inq_mechs_name t_iov t_lifetime t_pcontok t_s4u \
 	t_s4u2proxy_krb5 t_spnego t_srcattrs
 	$(RUNPYTEST) $(srcdir)/t_gssapi.py $(PYTESTFLAGS)
+	$(RUNPYTEST) $(srcdir)/t_interpose.py $(PYTESTFLAGS)
 	$(RUNPYTEST) $(srcdir)/t_ccselect.py $(PYTESTFLAGS)
 	$(RUNPYTEST) $(srcdir)/t_client_keytab.py $(PYTESTFLAGS)
 	$(RUNPYTEST) $(srcdir)/t_enctypes.py $(PYTESTFLAGS)
