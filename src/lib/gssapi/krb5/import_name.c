@@ -243,19 +243,15 @@ krb5_gss_import_name(minor_status, input_name_buffer,
             if (*cp++ != 0x00)
                 goto fail_name;
             length = *cp++;
-            if (length != (ssize_t)gss_mech_krb5->length+2)
-                goto fail_name;
 
             BOUNDS_CHECK(cp, end, 2);
             if (*cp++ != 0x06)
                 goto fail_name;
-            length = *cp++;
-            if (length != (ssize_t)gss_mech_krb5->length)
+            if (*cp != length - 2)
                 goto fail_name;
+            length = *cp++;
 
             BOUNDS_CHECK(cp, end, length);
-            if (memcmp(cp, gss_mech_krb5->elements, length) != 0)
-                goto fail_name;
             cp += length;
 
             BOUNDS_CHECK(cp, end, 4);
