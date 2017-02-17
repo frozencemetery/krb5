@@ -194,7 +194,7 @@ importExportName(minor, unionName, inputNameType)
     gss_union_name_t unionName;
     gss_OID inputNameType;
 {
-    gss_OID_desc mechOid;
+    gss_OID_desc mechOid, *selected_mech;
     gss_buffer_desc expName;
     unsigned char *buf;
     gss_mechanism mech;
@@ -249,7 +249,13 @@ importExportName(minor, unionName, inputNameType)
 	return (GSS_S_DEFECTIVE_TOKEN);
 
     buf += mechOid.length;
-    if ((mech = gssint_get_mechanism(&mechOid)) == NULL)
+
+    major = gssint_select_mech_type(minor, &mechOid, &selected_mech);
+    if (major != GSS_S_COMPLETE)
+        return GSS_S_BAD_MECH;
+
+    mech = gssint_get_mechanism(selected_mech);
+    if (mech == NULL)
 	return (GSS_S_BAD_MECH);
 
     if (mech->gssspi_import_name_by_mech == NULL &&

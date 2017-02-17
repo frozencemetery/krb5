@@ -88,8 +88,8 @@ the token.  These functions have the following signatures::
 
 To re-enter the original mechanism when importing tokens for the above
 functions, the interposer module must wrap the mechanism token in the
-mechglue's format, using the concatenated OID (except in
-**gss_import_name**).  The mechglue token formats are:
+mechglue's format, using the concatenated OID.  The mechglue token formats
+are:
 
 * For **gss_import_sec_context**, a four-byte OID length in big-endian
   order, followed by the concatenated OID, followed by the mechanism
@@ -97,10 +97,10 @@ mechglue's format, using the concatenated OID (except in
 
 * For **gss_import_name**, the bytes 04 01, followed by two plus the
   OID length in big-endian order, followed by the byte 06, followed by
-  the OID length as a single byte, followed by the OID itself,
-  followed by the four byte big-endian length of the mechanism token,
-  followed by the mechanism token itself.  input_name_type must also
-  be set to GSS_C_NT_EXPORT_NAME.
+  the OID length as a single byte, followed by the concatenated OID
+  itself, followed by the four byte big-endian length of the mechanism
+  token, followed by the mechanism token itself.  input_name_type must
+  also be set to GSS_C_NT_EXPORT_NAME.
 
 * For **gss_import_cred**, a four-byte OID length in big-endian order,
   followed by the concatenated OID, followed by the mechanism token.
