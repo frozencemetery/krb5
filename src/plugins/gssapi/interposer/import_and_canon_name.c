@@ -67,11 +67,14 @@ OM_uint32 gssi_import_name_by_mech(OM_uint32 *minor_status,
     uint32_t be_len32;
     char *tokbuf;
     size_t i;
+    gss_OID spmech;
 
     GSSI_TRACE();
 
+    spmech = re_special_mech(mech_type);
+
     wrap_token.length = 2 + sizeof(uint16_t) + 1 +
-        sizeof(uint8_t) + mech_type->length +
+        sizeof(uint8_t) + spmech->length +
         sizeof(uint32_t) + input_name_buffer->length; 
     tokbuf = malloc(wrap_token.length);
     if (!tokbuf) {
@@ -84,16 +87,16 @@ OM_uint32 gssi_import_name_by_mech(OM_uint32 *minor_status,
     tokbuf[i++] = 0x04;
     tokbuf[i++] = 0x01;
 
-    be_len16 = htobe16(mech_type->length + 2);
+    be_len16 = htobe16(spmech->length + 2);
     memcpy(tokbuf + i, &be_len16, sizeof(uint16_t));
     i += sizeof(uint16_t);
 
     tokbuf[i++] = 0x06;
 
-    tokbuf[i++] = (uint8_t)(mech_type->length);
+    tokbuf[i++] = (uint8_t)(spmech->length);
 
-    memcpy(tokbuf + i, mech_type->elements, mech_type->length);
-    i += mech_type->length;
+    memcpy(tokbuf + i, spmech->elements, spmech->length);
+    i += spmech->length;
 
     be_len32 = htobe32(input_name_buffer->length);
     memcpy(tokbuf + i, &be_len32, sizeof(uint32_t));
