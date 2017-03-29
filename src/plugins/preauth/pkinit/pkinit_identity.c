@@ -608,7 +608,6 @@ pkinit_identity_prompt(krb5_context context,
             retval = pkinit_cert_matching(context, plg_cryptoctx,
                                           req_cryptoctx, id_cryptoctx, princ);
             if (retval) {
-                pkiDebug("%s: No matching certificate found\n", __FUNCTION__);
                 crypto_free_cert_info(context, plg_cryptoctx, req_cryptoctx,
                                       id_cryptoctx);
                 goto errout;
@@ -621,8 +620,6 @@ pkinit_identity_prompt(krb5_context context,
             retval = crypto_cert_select_default(context, plg_cryptoctx,
                                                 req_cryptoctx, id_cryptoctx);
             if (retval) {
-                pkiDebug("%s: Failed while selecting default certificate\n",
-                         __FUNCTION__);
                 crypto_free_cert_info(context, plg_cryptoctx, req_cryptoctx,
                                       id_cryptoctx);
                 goto errout;
