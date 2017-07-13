@@ -94,12 +94,15 @@ static gss_OID get_mech_oid(OM_uint32 *, unsigned char **, size_t);
 static gss_buffer_t get_input_token(unsigned char **, unsigned int);
 static gss_OID_set get_mech_set(OM_uint32 *, unsigned char **, unsigned int);
 static OM_uint32 get_req_flags(unsigned char **, OM_uint32, OM_uint32 *);
+static OM_uint32 prioritize_available_mechs(OM_uint32 *, gss_OID_set,
+					    gss_OID_set *);
 static OM_uint32 get_available_mechs(OM_uint32 *, gss_name_t, gss_cred_usage_t,
 				     gss_const_key_value_set_t,
-				     gss_cred_id_t *, gss_OID_set *,
-				     OM_uint32 *);
+				     gss_cred_id_t *, gss_OID_set,
+				     gss_OID_set *, OM_uint32 *);
 static OM_uint32 get_negotiable_mechs(OM_uint32 *, spnego_gss_cred_id_t,
-				      gss_cred_usage_t, gss_OID_set *);
+				      gss_cred_usage_t, gss_OID_set,
+				      gss_OID_set *);
 static void release_spnego_ctx(spnego_gss_ctx_id_t *);
 static spnego_gss_ctx_id_t create_spnego_ctx(int);
 static int put_mech_set(gss_OID_set mechSet, gss_buffer_t buf);
@@ -400,7 +403,7 @@ spnego_gss_acquire_cred_from(OM_uint32 *minor_status,
 	 */
 	status = get_available_mechs(minor_status, desired_name,
 				     cred_usage, cred_store, &mcred,
-				     &amechs, time_rec);
+				     GSS_C_NO_OID_SET, &amechs, time_rec);
 
 	if (actual_mechs && amechs != GSS_C_NULL_OID_SET) {
 		(void) gssint_copy_oid_set(&tmpmin, amechs, actual_mechs);
@@ -694,10 +697,26 @@ init_ctx_new(OM_uint32 *minor_status,
 	     send_token_flag *tokflag)
 {
 	OM_uint32 ret;
+	gss_OID_set preferred_attrs = GSS_C_NO_OID_SET;
+
+	/* Prefer mechanisms which support GSS_C_MA_CBINDING_CONFIRM
+	 * if GSS_C_CB_CONFIRM_FLAG is set. */
+	if (sc->req_flags & GSS_C_CB_CONFIRM_FLAG) {
+		sc->req_flags |= GSS_C_MUTUAL_FLAG;
+		ret = gss_create_empty_oid_set(minor_status, &preferred_attrs);
+		if (ret != GSS_S_COMPLETE)
+			return ret;
+
+		ret = gss_add_oid_set_member(minor_status,
+					     (gss_OID)GSS_C_MA_CBINDING_CONFIRM,
+					     &preferred_attrs);
+		if (ret != GSS_S_COMPLETE)
+			return ret;
+	}
 
 	/* determine negotiation mech set */
 	ret = get_negotiable_mechs(minor_status, spcred, GSS_C_INITIATE,
-				   &sc->mech_set);
+				   preferred_attrs, &sc->mech_set);
 	if (ret != GSS_S_COMPLETE)
 		return ret;
 
@@ -1304,7 +1323,7 @@ acc_ctx_hints(OM_uint32 *minor_status,
 	sc->internal_mech = GSS_C_NO_OID;
 	if (sc->DER_mechTypes.length == 0) {
 		ret = get_negotiable_mechs(minor_status, spcred, GSS_C_ACCEPT,
-					   &supported_mechSet);
+					   GSS_C_NO_OID_SET, &supported_mechSet);
 		if (ret != GSS_S_COMPLETE)
 			goto cleanup;
 
@@ -1362,7 +1381,7 @@ acc_ctx_new(OM_uint32 *minor_status,
 		goto cleanup;
 	}
 	ret = get_negotiable_mechs(minor_status, spcred, GSS_C_ACCEPT,
-				   &supported_mechSet);
+				   GSS_C_NO_OID_SET, &supported_mechSet);
 	if (ret != GSS_S_COMPLETE) {
 		*return_token = NO_TOKEN_SEND;
 		goto cleanup;
@@ -1933,6 +1952,7 @@ spnego_gss_inquire_cred(
 			GSS_C_BOTH,
 			GSS_C_NO_CRED_STORE,
 			&creds,
+			GSS_C_NO_OID_SET,
 			mechanisms, NULL);
 		if (status != GSS_S_COMPLETE) {
 			dsyslog("Leaving inquire_cred\n");
@@ -2694,7 +2714,8 @@ spnego_gss_acquire_cred_with_password(OM_uint32 *minor_status,
 
 	status = get_available_mechs(minor_status, desired_name,
 				     cred_usage, GSS_C_NO_CRED_STORE,
-				     NULL, &amechs, NULL);
+				     NULL, GSS_C_NO_OID_SET,
+				     &amechs, NULL);
 	if (status != GSS_S_COMPLETE)
 	    goto cleanup;
 
@@ -3079,6 +3100,75 @@ release_spnego_ctx(spnego_gss_ctx_id_t *ctx)
 }
 
 /*
+ * For channel binding purposes, we wish to filter gss_indicate_mechs_by_attrs
+ * to sort the returned mechs, having mechs with the preferred attrs first.
+ * This will enable SPENGO to negotiate these mechs if possible, but still
+ * fallback on other mechanisms which don't support these attrs.
+ *
+ * Assumes mechs is not NULL.
+ */
+static OM_uint32
+prioritize_available_mechs(OM_uint32 *minor_status, gss_OID_set preferred_attrs,
+			   gss_OID_set *mechs)
+{
+	size_t i;
+	int present;
+	OM_uint32 major_status = GSS_S_COMPLETE;
+
+	gss_OID_set avail_mechs = GSS_C_NO_OID_SET;
+	gss_OID_set_desc except_attrs;
+	gss_OID_desc attr_oids[2];
+
+	attr_oids[0] = *GSS_C_MA_DEPRECATED;
+	attr_oids[1] = *GSS_C_MA_NOT_DFLT_MECH;
+	except_attrs.count = 2;
+	except_attrs.elements = attr_oids;
+
+	*mechs = GSS_C_NO_OID_SET;
+
+	major_status = gss_indicate_mechs_by_attrs(minor_status,
+						   preferred_attrs,
+						   &except_attrs,
+						   GSS_C_NO_OID_SET,
+						   mechs);
+	if (major_status != GSS_S_COMPLETE ||
+	    preferred_attrs == GSS_C_NO_OID_SET) {
+		goto cleanup;
+	}
+
+	major_status = gss_indicate_mechs_by_attrs(minor_status,
+						   GSS_C_NO_OID_SET,
+						   &except_attrs,
+						   GSS_C_NO_OID_SET,
+						   &avail_mechs);
+
+	for (i = 0; i < avail_mechs->count && major_status == GSS_S_COMPLETE; i++) {
+		gss_OID current_element = &avail_mechs->elements[i];
+
+		major_status = gss_test_oid_set_member(minor_status,
+						       current_element,
+						       *mechs,
+						       &present);
+
+		if (major_status == GSS_S_COMPLETE && !present) {
+			major_status = gss_add_oid_set_member(minor_status,
+							      current_element,
+							      mechs);
+		}
+	}
+
+
+cleanup:
+	if (major_status != GSS_S_COMPLETE) {
+		(void)gss_release_oid_set(minor_status, mechs);
+		*mechs = GSS_C_NO_OID_SET;
+	}
+
+	(void)gss_release_oid_set(minor_status, &avail_mechs);
+	return major_status;
+}
+
+/*
  * Can't use gss_indicate_mechs by itself to get available mechs for
  * SPNEGO because it will also return the SPNEGO mech and we do not
  * want to consider SPNEGO as an available security mech for
@@ -3094,24 +3184,16 @@ static OM_uint32
 get_available_mechs(OM_uint32 *minor_status,
 	gss_name_t name, gss_cred_usage_t usage,
 	gss_const_key_value_set_t cred_store,
-	gss_cred_id_t *creds, gss_OID_set *rmechs, OM_uint32 *time_rec)
+	gss_cred_id_t *creds, gss_OID_set preferred_attrs,
+	gss_OID_set *rmechs, OM_uint32 *time_rec)
 {
 	unsigned int	i;
 	int		found = 0;
 	OM_uint32 major_status = GSS_S_COMPLETE, tmpmin;
 	gss_OID_set mechs, goodmechs;
-	gss_OID_set_desc except_attrs;
-	gss_OID_desc attr_oids[2];
 
-	attr_oids[0] = *GSS_C_MA_DEPRECATED;
-	attr_oids[1] = *GSS_C_MA_NOT_DFLT_MECH;
-	except_attrs.count = 2;
-	except_attrs.elements = attr_oids;
-	major_status = gss_indicate_mechs_by_attrs(minor_status,
-						   GSS_C_NO_OID_SET,
-						   &except_attrs,
-						   GSS_C_NO_OID_SET, &mechs);
-
+	major_status = prioritize_available_mechs(minor_status, preferred_attrs,
+						  &mechs);
 	if (major_status != GSS_S_COMPLETE) {
 		return (major_status);
 	}
@@ -3180,7 +3262,8 @@ get_available_mechs(OM_uint32 *minor_status,
  */
 static OM_uint32
 get_negotiable_mechs(OM_uint32 *minor_status, spnego_gss_cred_id_t spcred,
-		     gss_cred_usage_t usage, gss_OID_set *rmechs)
+		     gss_cred_usage_t usage, gss_OID_set preferred_attrs,
+		     gss_OID_set *rmechs)
 {
 	OM_uint32 ret, tmpmin;
 	gss_cred_id_t creds = GSS_C_NO_CREDENTIAL, *credptr;
@@ -3198,7 +3281,7 @@ get_negotiable_mechs(OM_uint32 *minor_status, spnego_gss_cred_id_t spcred,
 		credptr = (usage == GSS_C_INITIATE) ? &creds : NULL;
 		ret = get_available_mechs(minor_status, GSS_C_NO_NAME, usage,
 					  GSS_C_NO_CRED_STORE, credptr,
-					  rmechs, NULL);
+					  preferred_attrs, rmechs, NULL);
 		gss_release_cred(&tmpmin, &creds);
 		return (ret);
 	}
