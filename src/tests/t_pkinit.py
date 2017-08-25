@@ -26,6 +26,7 @@ user_enc_p12 = os.path.join(certs, 'user-enc.p12')
 user_upn_p12 = os.path.join(certs, 'user-upn.p12')
 user_upn2_p12 = os.path.join(certs, 'user-upn2.p12')
 user_upn3_p12 = os.path.join(certs, 'user-upn3.p12')
+generic_p12 = os.path.join(certs, 'generic.p12')
 path = os.path.join(os.getcwd(), 'testdir', 'tmp-pkinit-certs')
 path_enc = os.path.join(os.getcwd(), 'testdir', 'tmp-pkinit-certs-enc')
 
@@ -65,6 +66,7 @@ p12_identity = 'PKCS12:%s' % user_p12
 p12_upn_identity = 'PKCS12:%s' % user_upn_p12
 p12_upn2_identity = 'PKCS12:%s' % user_upn2_p12
 p12_upn3_identity = 'PKCS12:%s' % user_upn3_p12
+p12_generic_identity = 'PKCS12:%s' % generic_p12
 p12_enc_identity = 'PKCS12:%s' % user_enc_p12
 p11_identity = 'PKCS11:soft-pkcs11.so'
 p11_token_identity = ('PKCS11:module_name=soft-pkcs11.so:'
@@ -283,6 +285,14 @@ realm.run(['./responder', '-X', 'X509_user_identity=%s' % p12_enc_identity,
            realm.user_princ])
 realm.klist(realm.user_princ)
 realm.run([kvno, realm.host_princ])
+
+# Authorize a client cert with no PKINIT extensions using subject and
+# issuer.  (Relies on EKU checking being turned off.)
+rule = '&&<SUBJECT>CN=user$<ISSUER>O=MIT,'
+realm.run([kadminl, 'setstr', realm.user_princ, 'pkinit_cert_match', rule])
+realm.kinit(realm.user_princ,
+            flags=['-X', 'X509_user_identity=%s' % p12_generic_identity])
+realm.klist(realm.user_princ)
 
 if not have_soft_pkcs11:
     skip_rest('PKINIT PKCS11 tests', 'soft-pkcs11.so not found')
