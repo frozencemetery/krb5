@@ -100,8 +100,8 @@ typedef struct _pkinit_cert_matching_data {
     char *issuer_dn;	    /* rfc2253-style issuer name string */
     unsigned int ku_bits;   /* key usage information */
     unsigned int eku_bits;  /* extended key usage information */
-    krb5_principal *sans;   /* Null-terminated array of subject alternative
-			       name info (pkinit and ms-upn) */
+    krb5_principal *sans;   /* Null-terminated array of PKINIT SANs */
+    krb5_principal *upns;   /* Null-terimnated array of UPN SANs */
 } pkinit_cert_matching_data;
 
 /*

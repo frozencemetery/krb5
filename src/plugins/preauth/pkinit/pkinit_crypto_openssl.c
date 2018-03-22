@@ -5110,6 +5110,9 @@ crypto_cert_free_matching_data(krb5_context context,
     for (i = 0; md->sans != NULL && md->sans[i] != NULL; i++)
         krb5_free_principal(context, md->sans[i]);
     free(md->sans);
+    for (i = 0; md->upns != NULL && md->upns[i] != NULL; i++)
+        krb5_free_principal(context, md->upns[i]);
+    free(md->upns);
     free(md);
 }
 
@@ -5138,8 +5141,6 @@ get_matching_data(krb5_context context,
 {
     krb5_error_code ret = ENOMEM;
     pkinit_cert_matching_data *md = NULL;
-    krb5_principal *pkinit_sans = NULL, *upn_sans = NULL;
-    size_t i, j;
 
     *md_out = NULL;
 
@@ -5156,39 +5157,9 @@ get_matching_data(krb5_context context,
 
     /* Get the SAN data. */
     ret = crypto_retrieve_X509_sans(context, plg_cryptoctx, req_cryptoctx,
-                                    cert, &pkinit_sans, &upn_sans, NULL);
+                                    cert, &md->sans, &md->upns, NULL);
     if (ret)
         goto cleanup;
-
-    j = 0;
-    if (pkinit_sans != NULL) {
-        for (i = 0; pkinit_sans[i] != NULL; i++)
-            j++;
-    }
-    if (upn_sans != NULL) {
-        for (i = 0; upn_sans[i] != NULL; i++)
-            j++;
-    }
-    if (j != 0) {
-        md->sans = calloc((size_t)j+1, sizeof(*md->sans));
-        if (md->sans == NULL) {
-            ret = ENOMEM;
-            goto cleanup;
-        }
-        j = 0;
-        if (pkinit_sans != NULL) {
-            for (i = 0; pkinit_sans[i] != NULL; i++)
-                md->sans[j++] = pkinit_sans[i];
-            free(pkinit_sans);
-        }
-        if (upn_sans != NULL) {
-            for (i = 0; upn_sans[i] != NULL; i++)
-                md->sans[j++] = upn_sans[i];
-            free(upn_sans);
-        }
-        md->sans[j] = NULL;
-    } else
-        md->sans = NULL;
 
     /* Get the KU and EKU data. */
     ret = crypto_retrieve_X509_key_usage(context, plg_cryptoctx,
