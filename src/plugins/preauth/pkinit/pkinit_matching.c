@@ -490,11 +490,7 @@ component_match(krb5_context context,
                     break;
             }
             for (i = 0; md->upns != NULL && md->upns[i] != NULL; i++) {
-                krb5_unparse_name_flags(context, md->upns[i],
-                                        KRB5_PRINCIPAL_UNPARSE_NO_REALM,
-                                        &princ_string);
-                match = regexp_match(context, rc, princ_string);
-                krb5_free_unparsed_name(context, princ_string);
+                match = regexp_match(context, rc, md->upns[i]);
                 if (match)
                     break;
             }
@@ -584,14 +580,8 @@ check_all_certs(krb5_context context,
             pkiDebug("%s: PKINIT san: '%s'\n", __FUNCTION__, san_string);
             krb5_free_unparsed_name(context, san_string);
         }
-        for (j = 0; md->upns != NULL && md->upns[j] != NULL; j++) {
-            char *san_string;
-            krb5_unparse_name_flags(context, md->upns[j],
-                                    KRB5_PRINCIPAL_UNPARSE_NO_REALM,
-                                    &san_string);
-            pkiDebug("%s: UPN san: '%s'\n", __FUNCTION__, san_string);
-            krb5_free_unparsed_name(context, san_string);
-        }
+        for (j = 0; md->upns != NULL && md->upns[j] != NULL; j++)
+            pkiDebug("%s: UPN san: '%s'\n", __FUNCTION__, md->upns[j]);
 #endif
         certs_checked++;
         for (rc = rs->crs; rc != NULL; rc = rc->next) {

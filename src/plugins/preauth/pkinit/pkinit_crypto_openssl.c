@@ -29,6 +29,7 @@
  * SUCH DAMAGES.
  */
 
+#include "k5-int.h"
 #include "pkinit_crypto_openssl.h"
 #include "k5-buf.h"
 #include <dlfcn.h>
@@ -2095,15 +2096,14 @@ crypto_retrieve_X509_sans(krb5_context context,
                           pkinit_plg_crypto_context plgctx,
                           pkinit_req_crypto_context reqctx,
                           X509 *cert,
-                          krb5_principal **princs_ret,
-                          krb5_principal **upn_ret,
+                          krb5_principal **princs_ret, char ***upn_ret,
                           unsigned char ***dns_ret)
 {
     krb5_error_code retval = EINVAL;
     char buf[DN_BUF_LEN];
     int p = 0, u = 0, d = 0, ret = 0, l;
     krb5_principal *princs = NULL;
-    krb5_principal *upns = NULL;
+    char **upns = NULL;
     unsigned char **dnss = NULL;
     unsigned int i, num_found = 0, num_sans = 0;
     X509_EXTENSION *ext = NULL;
@@ -2153,7 +2153,7 @@ crypto_retrieve_X509_sans(krb5_context context,
         }
     }
     if (upn_ret != NULL) {
-        upns = calloc(num_sans + 1, sizeof(krb5_principal));
+        upns = calloc(num_sans + 1, sizeof(*upns));
         if (upns == NULL) {
             retval = ENOMEM;
             goto cleanup;
@@ -2196,16 +2196,9 @@ crypto_retrieve_X509_sans(krb5_context context,
                 /* Prevent abuse of embedded null characters. */
                 if (memchr(name.data, '\0', name.length))
                     break;
-                ret = krb5_parse_name_flags(context, name.data,
-                                            KRB5_PRINCIPAL_PARSE_ENTERPRISE,
-                                            &upns[u]);
-                if (ret) {
-                    pkiDebug("%s: failed parsing ms-upn san value\n",
-                             __FUNCTION__);
-                } else {
-                    u++;
-                    num_found++;
-                }
+                upns[u] = k5memdup0(name.data, name.length, &ret);
+                if (upns[u] == NULL)
+                    goto cleanup;
             } else {
                 pkiDebug("%s: unrecognized othername oid in SAN\n",
                          __FUNCTION__);
@@ -2257,7 +2250,7 @@ cleanup:
         krb5_free_principal(context, princs[i]);
     free(princs);
     for (i = 0; upns != NULL && upns[i] != NULL; i++)
-        krb5_free_principal(context, upns[i]);
+        free(upns[i]);
     free(upns);
     for (i = 0; dnss != NULL && dnss[i] != NULL; i++)
         free(dnss[i]);
@@ -2281,8 +2274,7 @@ crypto_retrieve_cert_sans(krb5_context context,
                           pkinit_plg_crypto_context plgctx,
                           pkinit_req_crypto_context reqctx,
                           pkinit_identity_crypto_context idctx,
-                          krb5_principal **princs_ret,
-                          krb5_principal **upn_ret,
+                          krb5_principal **princs_ret, char ***upn_ret,
                           unsigned char ***dns_ret)
 {
     krb5_error_code retval = EINVAL;
@@ -5111,7 +5103,7 @@ crypto_cert_free_matching_data(krb5_context context,
         krb5_free_principal(context, md->sans[i]);
     free(md->sans);
     for (i = 0; md->upns != NULL && md->upns[i] != NULL; i++)
-        krb5_free_principal(context, md->upns[i]);
+        free(md->upns[i]);
     free(md->upns);
     free(md);
 }
