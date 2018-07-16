@@ -61,9 +61,6 @@ OBJS=   \
 	$(OUTPRE)MainFrm.obj \
 	$(OUTPRE)out2con.obj \
 	$(OUTPRE)StdAfx.obj \
-	$(OUTPRE)AfsProperties.obj \
-	$(OUTPRE)VSroutines.obj \
-	$(OUTPRE)KrbMiscConfigOpt.obj \
 	$(OUTPRE)KrbListTickets.obj
 
 RESFILE = $(OUTPRE)Leash.res
