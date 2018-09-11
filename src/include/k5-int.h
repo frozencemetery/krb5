@@ -1121,7 +1121,9 @@ struct plugin_interface {
 #define PLUGIN_INTERFACE_CERTAUTH    10
 #define PLUGIN_INTERFACE_KADM5_AUTH  11
 #define PLUGIN_INTERFACE_KDCPOLICY   12
-#define PLUGIN_NUM_INTERFACES        13
+#define PLUGIN_INTERFACE_KDC2FA      13
+#define PLUGIN_INTERFACE_CL2FA       14
+#define PLUGIN_NUM_INTERFACES        15
 
 /* Retrieve the plugin module of type interface_id and name modname,
  * storing the result into module. */

@@ -1,0 +1,21 @@
+mydir=plugins$(S)2fa$(S)kdcfido
+BUILDTOP=$(REL)..$(S)..$(S)..
+MODULE_INSTALL_DIR = $(KRB5_PA_MODULE_DIR)
+
+LIBBASE=kdcfido
+LIBMAJOR=0
+LIBMINOR=0
+RELDIR=../plugins/2fa/kdcfido
+SHLIB_EXPDEPS=$(KRB5_BASE_DEPLIBS)
+SHLIB_EXPLIBS=$(KRB5_BASE_LIBS) $(FIDO_LIBS)
+
+STLIBOBJS=main.o
+
+SRCS=$(srcdir)/main.c
+
+all-unix: all-liblinks
+install-unix: install-libs
+clean-unix:: clean-liblinks clean-libs clean-libobjs
+
+@libnover_frag@
+@libobj_frag@

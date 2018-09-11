@@ -76,4 +76,4 @@ results.  A synchronous implementation can invoke the responder
 function immediately.  An asynchronous implementation can use the
 callback to get an event context for use with the libverto_ API.
 
-.. _libverto: https://fedorahosted.org/libverto/
+.. _libverto: https://github.com/latchset/libverto/

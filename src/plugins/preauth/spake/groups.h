@@ -36,6 +36,9 @@
 #include "k5-int.h"
 #include "iana.h"
 
+#include "krb5/cl2fa_plugin.h"
+#include "krb5/kdc2fa_plugin.h"
+
 typedef struct groupstate_st groupstate;
 typedef struct groupdata_st groupdata;
 typedef struct groupdef_st groupdef;

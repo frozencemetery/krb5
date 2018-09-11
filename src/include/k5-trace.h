@@ -502,4 +502,9 @@ void krb5int_trace(krb5_context context, const char *fmt, ...);
 #define TRACE_KDCPOLICY_INIT_SKIP(c, name)                              \
     TRACE(c, "kadm5_auth module {str} declined to initialize", name)
 
+#define TRACE_KDC2FA_VTINIT_FAIL(c, ret) \
+    TRACE(c, "KDC 2fa module failed to init vtable: {kerr}", ret)
+#define TRACE_KDC2FA_INIT_SKIP(c, name)  \
+    TRACE(c, "KDC 2fa module {str} declined to initialize", name)
+
 #endif /* K5_TRACE_H */

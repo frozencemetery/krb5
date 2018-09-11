@@ -1278,6 +1278,24 @@ AC_SUBST(HAVE_LMDB)
 AC_SUBST(LMDB_LIBS)
 AC_SUBST(lmdb_plugin_dir)
 
+HAVE_FIDO=no
+AC_ARG_WITH([fido],
+AC_HELP_STRING([--with-fido],
+	    [support FIDO/U2F in SPAKE @<:@auto@:>@]),,
+            [with_fido=auto])
+if test "x$with_fido" != xno; then
+  PKG_CHECK_MODULES(FIDO, libfido2, [have_fido=yes], [have_fido=no])
+  if test "x$have_fido" = xyes; then
+    AC_SUBST([FIDO_CFLAGS])
+    AC_SUBST([FIDO_LIBS])
+    AC_DEFINE([HAVE_FIDO], 1, [Define if building with libfido2.])
+  elif test "x$with_fido" = xauto; then
+    AC_MSG_NOTICE([Not building FIDO/U2F support])
+  else
+    AC_MSG_ERROR([libfido2 not found!])
+  fi
+fi
+
 # Kludge for simple server --- FIXME is this the best way to do this?
 
 if test "$ac_cv_lib_socket" = "yes" -a "$ac_cv_lib_nsl" = "yes"; then
@@ -1477,6 +1495,9 @@ dnl	ccapi ccapi/lib ccapi/lib/unix ccapi/server ccapi/server/unix ccapi/test
 	plugins/kdb/db2/libdb2/test
 	plugins/kdb/test
 	plugins/kdcpolicy/test
+	plugins/2fa/kdcfido
+	plugins/2fa/clfido
+	plugins/2fa/test
 	plugins/preauth/otp
 	plugins/preauth/spake
 	plugins/preauth/test
