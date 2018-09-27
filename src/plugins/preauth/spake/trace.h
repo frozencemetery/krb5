@@ -70,6 +70,11 @@
     TRACE(c, "Sending SPAKE support message")
 #define TRACE_SPAKE_UNKNOWN_GROUP(c, name)                      \
     TRACE(c, "Unrecognized SPAKE group name: {str}", name)
+#define TRACE_SPAKE_SECOND_FACTOR(c, name, number)      \
+    TRACE(c, "Trying SPAKE second factor {int} (module: {str})", number, name)
+#define TRACE_SPAKE_SECOND_FACTOR_RET(c, name, number, ret) \
+    TRACE(c, "SPAKE second factor {int} (module: {str}) returned {kerr}", \
+          number, name, ret)
 #define TRACE_SPAKE_2F_REJECT(c, number, code)  \
     TRACE(c, "SPAKE second factor {int} rejected ({kerr})", number, code)
 

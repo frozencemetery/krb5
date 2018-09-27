@@ -1,7 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /* plugins/preauth/spake/spake_client.c - SPAKE clpreauth module */
 /*
- * Copyright (C) 2015 by the Massachusetts Institute of Technology.
+ * Copyright (C) 2015, 2018 by the Massachusetts Institute of Technology.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,44 +38,111 @@
 #include "groups.h"
 #include <krb5/clpreauth_plugin.h>
 
+typedef struct cl2fa_handle_st {
+    struct krb5_cl2fa_vtable_st vt;
+    krb5_cl2fa_moddata moddata;
+} cl2fa_handle;
+
+typedef struct spakestate_st {
+    groupstate *gstate;
+    cl2fa_handle **handles;
+} spakestate;
+
 typedef struct reqstate_st {
     krb5_pa_spake *msg;         /* set in prep_questions, used in process */
     krb5_keyblock *initial_key;
     krb5_data *support;
     krb5_data thash;
     krb5_data spakeresult;
+    int32_t factor_number;
+    krb5_cl2fa_reqdata factordata;
 } reqstate;
 
-/* Return true if SF-NONE is present in factors. */
-static krb5_boolean
-contains_sf_none(krb5_spake_factor **factors)
+/* Return a factor if its number is present in factors. */
+static krb5_spake_factor *
+get_sf(krb5_spake_factor **factors, int32_t f)
 {
     int i;
 
     for (i = 0; factors != NULL && factors[i] != NULL; i++) {
-        if (factors[i]->type == SPAKE_SF_NONE)
-            return TRUE;
+        if (factors[i]->type == f)
+            return factors[i];
     }
-    return FALSE;
+    return 0;
 }
 
 static krb5_error_code
 spake_init(krb5_context context, krb5_clpreauth_moddata *moddata_out)
 {
     krb5_error_code ret;
-    groupstate *gstate;
+    krb5_plugin_initvt_fn *modules = NULL, *mod;
+    cl2fa_handle *h, **handles = NULL;
+    spakestate *st;
+    size_t count;
 
-    ret = group_init_state(context, FALSE, &gstate);
+    st = k5calloc(1, sizeof(*st), &ret);
+    if (st == NULL)
+        return ret;
+
+    ret = group_init_state(context, FALSE, &st->gstate);
     if (ret)
         return ret;
-    *moddata_out = (krb5_clpreauth_moddata)gstate;
+
+    ret = k5_plugin_load_all(context, PLUGIN_INTERFACE_CL2FA, &modules);
+    if (ret != 0)
+        goto done;
+
+    for (count = 0; modules[count] != NULL; count++);
+    handles = k5calloc(count + 1, sizeof(*handles), &ret);
+    if (handles == NULL)
+        goto done;
+
+    count = 0;
+    for (mod = modules; *mod != NULL; mod++) {
+        h = k5calloc(1, sizeof(*h), &ret);
+        if (h == NULL)
+            goto done;
+
+        ret = (*mod)(context, 1, 1, (krb5_plugin_vtable)&h->vt);
+        if (ret != 0) {
+            free(h);
+            continue;
+        }
+
+        if (h->vt.init != NULL)
+            ret = h->vt.init(context, &h->moddata);
+        if (ret != 0) {
+            free(h);
+            continue;
+        }
+
+        handles[count++] = h;
+    }
+
+    st->handles = handles;
+    *moddata_out = (krb5_clpreauth_moddata)st;
+    ret = 0;
+done:
+    if (ret) {
+        group_free_state(st->gstate);
+        for (h = *handles; h != NULL; h++)
+            free(h);
+        free(handles);
+    }
+    k5_plugin_free_modules(context, modules);
     return 0;
 }
 
 static void
 spake_fini(krb5_context context, krb5_clpreauth_moddata moddata)
 {
-    group_free_state((groupstate *)moddata);
+    int i;
+    spakestate *st = (spakestate *)moddata;
+
+    for (i = 0; st->handles != NULL && st->handles[i] != NULL; i++)
+        free(st->handles[i]);
+    free(st->handles);
+    group_free_state(st->gstate);
 }
 
 static void
@@ -89,7 +156,19 @@ static void
 spake_request_fini(krb5_context context, krb5_clpreauth_moddata moddata,
                    krb5_clpreauth_modreq modreq)
 {
+    spakestate *sstate = (spakestate *)moddata;
     reqstate *st = (reqstate *)modreq;
+    struct krb5_cl2fa_vtable_st *vt;
+    int i;
+
+    for (i = 0; sstate->handles != NULL && sstate->handles[i] != NULL; i++) {
+        vt = &sstate->handles[i]->vt;
+        if (vt->factor == st->factor_number) {
+            if (vt->request_fini != NULL)
+                vt->request_fini(context, st->factordata);
+            break;
+        }
+    }
 
     k5_free_pa_spake(context, st->msg);
     krb5_free_keyblock(context, st->initial_key);
@@ -108,7 +187,8 @@ spake_prep_questions(krb5_context context, krb5_clpreauth_moddata moddata,
                      krb5_pa_data *pa_data)
 {
     krb5_error_code ret;
-    groupstate *gstate = (groupstate *)moddata;
+    spakestate *sstate = (spakestate *)moddata;
+    groupstate *gstate = sstate->gstate;
     reqstate *st = (reqstate *)modreq;
     krb5_data in_data;
     krb5_spake_challenge *ch;
@@ -135,7 +215,7 @@ spake_prep_questions(krb5_context context, krb5_clpreauth_moddata moddata,
             return 0;
         /* When second factor support is implemented, we should ask questions
          * based on the factors in the challenge. */
-        if (!contains_sf_none(ch->factors))
+        if (get_sf(ch->factors, SPAKE_SF_NONE) == NULL)
             return 0;
         /* We will need the AS key to respond to the challenge. */
         cb->need_as_key(context, rock);
@@ -153,7 +233,7 @@ spake_prep_questions(krb5_context context, krb5_clpreauth_moddata moddata,
  * message in st->support.
  */
 static krb5_error_code
-send_support(krb5_context context, groupstate *gstate, reqstate *st,
+send_support(krb5_context context, spakestate *sstate, reqstate *st,
              krb5_pa_data ***pa_out)
 {
     krb5_error_code ret;
@@ -161,7 +241,8 @@ send_support(krb5_context context, groupstate *gstate, reqstate *st,
     krb5_pa_spake msg;
 
     msg.choice = SPAKE_MSGTYPE_SUPPORT;
-    group_get_permitted(gstate, &msg.u.support.groups, &msg.u.support.ngroups);
+    group_get_permitted(sstate->gstate, &msg.u.support.groups,
+                        &msg.u.support.ngroups);
     ret = encode_krb5_pa_spake(&msg, &support);
     if (ret)
         return ret;
@@ -178,20 +259,26 @@ send_support(krb5_context context, groupstate *gstate, reqstate *st,
 }
 
 static krb5_error_code
-process_challenge(krb5_context context, groupstate *gstate, reqstate *st,
+process_challenge(krb5_context context, spakestate *sstate, reqstate *st,
                   krb5_spake_challenge *ch, const krb5_data *der_msg,
                   krb5_clpreauth_callbacks cb, krb5_clpreauth_rock rock,
                   krb5_prompter_fct prompter, void *prompter_data,
-                  const krb5_data *der_req, krb5_pa_data ***pa_out)
+                  const krb5_data *der_req, krb5_pa_data ***pa_out,
+                  const char *realm)
 {
     krb5_error_code ret;
     krb5_keyblock *k0 = NULL, *k1 = NULL, *as_key;
-    krb5_spake_factor factor;
+    krb5_spake_factor factor, *fchal = NULL;
     krb5_pa_spake msg;
     krb5_data *der_factor = NULL, *response;
     krb5_data clpriv = empty_data(), clpub = empty_data();
     krb5_data wbytes = empty_data();
     krb5_enc_data enc_factor;
+    cl2fa_handle **handles = NULL, *h;
+    uint8_t *fresponse = NULL;
+    size_t fresponse_len = 0;
+    int i;
+    groupstate *gstate = sstate->gstate;
 
     enc_factor.ciphertext = empty_data();
 
@@ -204,7 +291,7 @@ process_challenge(krb5_context context, groupstate *gstate, reqstate *st,
         /* No point in sending a second support message. */
         if (st->support != NULL)
             return KRB5KDC_ERR_PREAUTH_FAILED;
-        return send_support(context, gstate, st, pa_out);
+        return send_support(context, sstate, st, pa_out);
     }
 
     /* Initialize and update the transcript with the concatenation of the
@@ -216,10 +303,42 @@ process_challenge(krb5_context context, groupstate *gstate, reqstate *st,
 
     TRACE_SPAKE_RECEIVE_CHALLENGE(context, ch->group, &ch->pubkey);
 
-    /* When second factor support is implemented, we should check for a
-     * supported factor type instead of just checking for SF-NONE. */
-    if (!contains_sf_none(ch->factors))
-        return KRB5KDC_ERR_PREAUTH_FAILED;
+    handles = sstate->handles;
+    for (i = 0; handles != NULL && handles[i] != NULL; i++) {
+        h = handles[i];
+        fchal = get_sf(ch->factors, h->vt.factor);
+        if (fchal == NULL)
+            continue;
+
+        TRACE_SPAKE_SECOND_FACTOR(context, h->vt.name, fchal->type);
+
+        ret = h->vt.respond(context, h->moddata, &st->factordata, cb, rock,
+                            fchal->type, realm, (uint8_t *)fchal->data->data,
+                            fchal->data->length, &fresponse, &fresponse_len);
+        TRACE_SPAKE_SECOND_FACTOR_RET(context, h->vt.name, fchal->type, ret);
+        if (ret != 0) {
+            fchal = NULL;
+            continue;
+        }
+        st->factor_number = fchal->type;
+
+        factor.type = fchal->type;
+        if (fresponse_len != 0) {
+            factor.data = k5alloc(sizeof(krb5_data), &ret);
+            if (factor.data == NULL)
+                goto cleanup;
+            *factor.data = make_data(fresponse, fresponse_len);
+        }
+        break;
+    }
+    if (fchal == NULL) {
+        if (get_sf(ch->factors, SPAKE_SF_NONE) == NULL)
+            return KRB5KDC_ERR_PREAUTH_FAILED;
+
+        TRACE_SPAKE_SECOND_FACTOR(context, "none", SPAKE_SF_NONE);
+        factor.type = SPAKE_SF_NONE;
+        factor.data = NULL;
+    }
 
     ret = cb->get_as_key(context, rock, &as_key);
     if (ret)
@@ -257,10 +376,6 @@ process_challenge(krb5_context context, groupstate *gstate, reqstate *st,
                      &st->spakeresult, &st->thash, der_req, 1, &k1);
     if (ret)
         goto cleanup;
-    /* When second factor support is implemented, we should construct an
-     * appropriate factor here instead of hardcoding SF-NONE. */
-    factor.type = SPAKE_SF_NONE;
-    factor.data = NULL;
     ret = encode_krb5_spake_factor(&factor, &der_factor);
     if (ret)
         goto cleanup;
@@ -328,7 +443,7 @@ spake_process(krb5_context context, krb5_clpreauth_moddata moddata,
               void *prompter_data, krb5_pa_data ***pa_out)
 {
     krb5_error_code ret;
-    groupstate *gstate = (groupstate *)moddata;
+    spakestate *sstate = (spakestate *)moddata;
     reqstate *st = (reqstate *)modreq;
     krb5_data in_data;
 
@@ -339,7 +454,7 @@ spake_process(krb5_context context, krb5_clpreauth_moddata moddata,
         /* Not expected if we already sent a support message. */
         if (st->support != NULL)
             return KRB5KDC_ERR_PREAUTH_FAILED;
-        return send_support(context, gstate, st, pa_out);
+        return send_support(context, sstate, st, pa_out);
     }
 
     if (st->msg == NULL) {
@@ -347,9 +462,9 @@ spake_process(krb5_context context, krb5_clpreauth_moddata moddata,
         ret = KRB5KDC_ERR_PREAUTH_FAILED;
     } else if (st->msg->choice == SPAKE_MSGTYPE_CHALLENGE) {
         in_data = make_data(pa_in->contents, pa_in->length);
-        ret = process_challenge(context, gstate, st, &st->msg->u.challenge,
+        ret = process_challenge(context, sstate, st, &st->msg->u.challenge,
                                 &in_data, cb, rock, prompter, prompter_data,
-                                der_req, pa_out);
+                                der_req, pa_out, req->server->realm.data);
     } else if (st->msg->choice == SPAKE_MSGTYPE_ENCDATA) {
         ret = process_encdata(context, st, &st->msg->u.encdata, cb, rock,
                               prompter, prompter_data, der_prev_req, der_req,
