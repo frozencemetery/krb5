@@ -34,5 +34,6 @@ Contents
    internal.rst
    certauth.rst
    kdcpolicy.rst
+   kdc2fa.rst
 
 .. TODO: GSSAPI mechanism plugins
