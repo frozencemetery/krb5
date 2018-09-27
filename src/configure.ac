@@ -1516,6 +1516,7 @@ V5_AC_OUTPUT_MAKEFILE(.
 	plugins/kdb/db2/libdb2/test
 	plugins/kdb/test
 	plugins/kdcpolicy/test
+	plugins/2fa/test
 	plugins/preauth/otp
 	plugins/preauth/spake
 	plugins/preauth/test

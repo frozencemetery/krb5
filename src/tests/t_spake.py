@@ -42,6 +42,22 @@ for gnum, gname in groups:
                 '/Preauthentication failed')
         realm.kinit('user', 'wrongpw', expected_code=1, expected_trace=msgs)
 
+# Test a second factor
+mark('Second factor')
+sftest = os.path.join(buildtop, 'plugins', '2fa', 'test.so')
+sfconf = {'libdefaults': {'spake_preauth_groups': 'edwards25519'},
+          'kdcdefaults': {'spake_preauth_kdc_challenge': 'edwards25519'},
+          'plugins': {'kdc2fa': {'module': 'test:' + sftest},
+                      'cl2fa': {'module': 'test:' + sftest}}}
+realm = K5Realm(create_user=False, get_creds=False, krb5_conf=sfconf)
+realm.run([kadminl, 'addprinc', '+preauth', '-pw', 'pw', 'user'])
+msgs = ('Trying SPAKE second factor -87 (module: test)',
+        'SPAKE second factor -87 (module: test) returned 0/Success',
+        'Preauth module spake (151) (real) returned: 0/Success')
+realm.kinit('user', 'pw', expected_trace=msgs)
+realm.run(['./adata', realm.host_princ], expected_msg='+97: [ind2fatest]')
+realm.stop()
+
 conf = {'libdefaults': {'spake_preauth_groups': 'edwards25519'}}
 kdcconf = {'realms': {'$realm': {'spake_preauth_indicator': 'indspake'}}}
 realm = K5Realm(create_user=False, krb5_conf=conf, kdc_conf=kdcconf)
