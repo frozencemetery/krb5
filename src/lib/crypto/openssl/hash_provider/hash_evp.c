@@ -64,12 +64,16 @@ hash_evp(const EVP_MD *type, const krb5_crypto_iov *data, size_t num_data,
 static krb5_error_code
 hash_md4(const krb5_crypto_iov *data, size_t num_data, krb5_data *output)
 {
+    if (FIPS_mode())
+        return KRB5_CRYPTO_INTERNAL;
     return hash_evp(EVP_md4(), data, num_data, output);
 }
 
 static krb5_error_code
 hash_md5(const krb5_crypto_iov *data, size_t num_data, krb5_data *output)
 {
+    if (FIPS_mode())
+        return KRB5_CRYPTO_INTERNAL;
     return hash_evp(EVP_md5(), data, num_data, output);
 }
 
