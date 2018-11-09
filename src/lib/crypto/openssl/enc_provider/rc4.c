@@ -125,6 +125,9 @@ k5_arcfour_init_state(const krb5_keyblock *key,
 {
     struct arcfour_state *arcstate;
 
+    if (FIPS_mode())
+        return KRB5_CRYPTO_INTERNAL;
+
     /* Create a state structure with an uninitialized context. */
     arcstate = calloc(1, sizeof(*arcstate));
     if (arcstate == NULL)
