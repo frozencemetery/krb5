@@ -49,6 +49,13 @@
 
 typedef struct krad_remote_st krad_remote;
 
+struct krad_packet_st {
+    char buffer[KRAD_PACKET_SIZE_MAX];
+    krad_attrset *attrset;
+    krb5_data pkt;
+    krb5_boolean is_fips;
+};
+
 /* Validate constraints of an attribute. */
 krb5_error_code
 kr_attr_valid(krad_attr type, const krb5_data *data);
@@ -57,7 +64,8 @@ kr_attr_valid(krad_attr type, const krb5_data *data);
 krb5_error_code
 kr_attr_encode(krb5_context ctx, const char *secret, const unsigned char *auth,
                krad_attr type, const krb5_data *in,
-               unsigned char outbuf[MAX_ATTRSIZE], size_t *outlen);
+               unsigned char outbuf[MAX_ATTRSIZE], size_t *outlen,
+               krb5_boolean *is_fips);
 
 /* Decode an attribute. */
 krb5_error_code
@@ -69,7 +77,8 @@ kr_attr_decode(krb5_context ctx, const char *secret, const unsigned char *auth,
 krb5_error_code
 kr_attrset_encode(const krad_attrset *set, const char *secret,
                   const unsigned char *auth,
-                  unsigned char outbuf[MAX_ATTRSETSIZE], size_t *outlen);
+                  unsigned char outbuf[MAX_ATTRSETSIZE], size_t *outlen,
+                  krb5_boolean *is_fips);
 
 /* Decode attributes from a buffer. */
 krb5_error_code
