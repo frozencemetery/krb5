@@ -85,6 +85,9 @@ k5_des_encrypt(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
     EVP_CIPHER_CTX *ctx;
     krb5_boolean empty;
 
+    if (FIPS_mode())
+        return KRB5_CRYPTO_INTERNAL;
+
     ret = validate(key, ivec, data, num_data, &empty);
     if (ret != 0 || empty)
         return ret;
@@ -132,6 +135,9 @@ k5_des_decrypt(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
     struct iov_cursor cursor;
     EVP_CIPHER_CTX *ctx;
     krb5_boolean empty;
+
+    if (FIPS_mode())
+        return KRB5_CRYPTO_INTERNAL;
 
     ret = validate(key, ivec, data, num_data, &empty);
     if (ret != 0 || empty)
@@ -181,6 +187,9 @@ k5_des_cbc_mac(krb5_key key, const krb5_crypto_iov *data, size_t num_data,
     DES_cblock blockY, blockB;
     DES_key_schedule sched;
     krb5_boolean empty;
+
+    if (FIPS_mode())
+        return KRB5_CRYPTO_INTERNAL;
 
     ret = validate(key, ivec, data, num_data, &empty);
     if (ret != 0)
