@@ -194,6 +194,26 @@ The libdefaults section may contain any of the following relations:
     clients from taking advantage of new stronger enctypes when the
     libraries are upgraded.
 
+**disable_fips_compliance**
+    Disable all FIPS checks in OpenSSL for krb5.  Setting this option
+    will render your system noncompliant unless an encrypted tunnel
+    (such as https transport via kdcproxy, or other TLS channel) is
+    used for all system Kerberos traffic, or the permitted encryption
+    type lists (see **default_tgs_enctypes**,
+    **default_tkt_enctypes**, and in :ref:`kdc.conf(5)`
+    **supported_enctypes**) are changed to disallow forbidden
+    algorithms.
+
+    As of this writing, the FIPS permitted encryption types in krb5
+    are all of ``aes des3``.  FIPS currently designates 3DES and SHA1
+    as "legacy"; accordingly, the only non-legacy permitted enctypes
+    are ``aes256-sha2 aes128-sha2``.  Due to the administrator burden
+    of maintaining compliance otherwise, it is strongly recommended to
+    not enable this option.
+
+    This option is not present upstream because upstream does not
+    support FIPS.
+
 **dns_canonicalize_hostname**
     Indicate whether name lookups will be used to canonicalize
     hostnames for use in service principal names.  Setting this flag

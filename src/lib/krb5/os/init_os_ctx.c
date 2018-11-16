@@ -31,6 +31,8 @@
 #include "../krb/int-proto.h"
 #include "prof_int.h"        /* XXX for profile_copy, not public yet */
 
+#include <openssl/crypto.h>
+
 #if defined(_WIN32)
 #include <winsock.h>
 #include <Shlobj.h>
@@ -408,6 +410,20 @@ os_init_paths(krb5_context ctx, krb5_boolean kdc)
         (retval == PROF_MISSING_OBRACE))
         return KRB5_CONFIG_BADFORMAT;
 
+    if (!retval) {
+        /*
+         * You probably thought this was parser code.  Nope!  FIPS.  It goes
+         * here because we can't access profile data at crypto initialization
+         * time (no handles).
+         *
+         * Only change state when explicitly disabled.
+         */
+        int imode = 0;
+        profile_get_boolean(ctx->profile, "libdefaults",
+                            "disable_fips_compliance", NULL, 0, &imode);
+        if (imode == 1)
+            FIPS_mode_set(0);
+    }
     return retval;
 }
 
