@@ -532,7 +532,6 @@ decode_kdc_req_body(const taginfo *t, const unsigned char *asn1, size_t len,
         if (ret) {
             free_kdc_req_body(b);
             free(h.server_realm.data);
-            memset(&h, 0, sizeof(h));
             return ret;
         }
         b->server->realm = h.server_realm;
