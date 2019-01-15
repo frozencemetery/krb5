@@ -473,3 +473,6 @@ EXPORTS
 
 ; new in 1.16
 	k5_enctype_to_ssf				@438 ; PRIVATE GSSAPI
+
+; new in 1.18
+	krb5int_c_deprecated_enctype			@450 ; PRIVATE
