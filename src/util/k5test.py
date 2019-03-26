@@ -1246,16 +1246,6 @@ _passes = [
     # No special settings; exercises AES256.
     ('default', None, None, None),
 
-    # Exercise the DES3 enctype.
-    ('des3', None,
-     {'libdefaults': {
-                'default_tgs_enctypes': 'des3',
-                'default_tkt_enctypes': 'des3',
-                'permitted_enctypes': 'des3'}},
-     {'realms': {'$realm': {
-                    'supported_enctypes': 'des3-cbc-sha1:normal',
-                    'master_key_type': 'des3-cbc-sha1'}}}),
-
     # Exercise the arcfour enctype.
     ('arcfour', None,
      {'libdefaults': {
