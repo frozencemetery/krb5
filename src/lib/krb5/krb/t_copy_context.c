@@ -113,7 +113,7 @@ main(int argc, char **argv)
 {
     krb5_context ctx, ctx2;
     krb5_plugin_initvt_fn *mods;
-    const krb5_enctype etypes1[] = { ENCTYPE_DES3_CBC_SHA1, 0 };
+    const krb5_enctype etypes1[] = { ENCTYPE_AES128_CTS_HMAC_SHA256_128, 0 };
     const krb5_enctype etypes2[] = { ENCTYPE_AES128_CTS_HMAC_SHA1_96,
                                      ENCTYPE_AES256_CTS_HMAC_SHA1_96, 0 };
     krb5_prompt_type ptypes[] = { KRB5_PROMPT_TYPE_PASSWORD };
