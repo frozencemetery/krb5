@@ -56,6 +56,8 @@
 #include "trace.h"
 #include "groups.h"
 
+#include <openssl/crypto.h>
+
 #define DEFAULT_GROUPS_CLIENT "edwards25519"
 #define DEFAULT_GROUPS_KDC ""
 
@@ -102,6 +104,9 @@ find_gdef(int32_t group)
 {
     size_t i;
 
+    if (group == builtin_edwards25519.reg->id && FIPS_mode())
+        return NULL;
+
     for (i = 0; groupdefs[i] != NULL; i++) {
         if (groupdefs[i]->reg->id == group)
             return groupdefs[i];
@@ -115,6 +120,9 @@ static int32_t
 find_gnum(const char *name)
 {
     size_t i;
+
+    if (strcasecmp(name, builtin_edwards25519.reg->name) == 0 && FIPS_mode())
+        return 0;
 
     for (i = 0; groupdefs[i] != NULL; i++) {
         if (strcasecmp(name, groupdefs[i]->reg->name) == 0)
