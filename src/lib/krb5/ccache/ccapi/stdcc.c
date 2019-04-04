@@ -589,7 +589,6 @@ krb5_stdccv3_next_cred (krb5_context context,
         err = stdccv3_setup (context, ccapi_data);
     }
 
-    /* Note: CCAPI v3 ccaches can contain both v4 and v5 creds */
     while (!err) {
         err = cc_credentials_iterator_next (iterator, &credentials);
 
@@ -836,7 +835,6 @@ krb5_stdccv3_remove (krb5_context context,
                                                  &iterator);
     }
 
-    /* Note: CCAPI v3 ccaches can contain both v4 and v5 creds */
     while (!err && !found) {
         cc_credentials_t credentials = NULL;
 
