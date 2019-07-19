@@ -214,4 +214,6 @@ krb5_error_code localauth_k5login_initvt(krb5_context context, int maj_ver,
 krb5_error_code localauth_an2ln_initvt(krb5_context context, int maj_ver,
                                        int min_ver, krb5_plugin_vtable vtable);
 
+void k5_hotfind_free_context(krb5_context);
+
 #endif /* KRB5_LIBOS_INT_PROTO__ */

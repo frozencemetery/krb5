@@ -507,4 +507,9 @@ void krb5int_trace(krb5_context context, const char *fmt, ...);
 #define TRACE_KDCPOLICY_INIT_SKIP(c, name)                              \
     TRACE(c, "kadm5_auth module {str} declined to initialize", name)
 
+#define TRACE_HOTFIND_VTINIT_FAIL(c, ret)                             \
+    TRACE(c, "hotfind module failed to init vtable: {kerr}", ret)
+#define TRACE_HOTFIND_INIT_FAIL(c, name, ret)                         \
+    TRACE(c, "hotfind module {str} failed to init: {kerr}", name, ret)
+
 #endif /* K5_TRACE_H */

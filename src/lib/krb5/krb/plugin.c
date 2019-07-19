@@ -61,6 +61,7 @@ const char *interface_names[] = {
     "certauth",
     "kadm5_auth",
     "kdcpolicy",
+    "hotfind",
 };
 
 /* Return the context's interface structure for id, or NULL if invalid. */

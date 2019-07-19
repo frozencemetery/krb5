@@ -24,21 +24,15 @@
  */
 
 /*
- *
- * Service location plugin definitions for Kerberos 5.
+ * Service location plugin definitions for Kerberos 5.  This interface is
+ * deprecated; new implementers should use the hotfind interface instead.
  */
 
 #ifndef KRB5_LOCATE_PLUGIN_H_INCLUDED
 #define KRB5_LOCATE_PLUGIN_H_INCLUDED
-#include <krb5/krb5.h>
 
-enum locate_service_type {
-    locate_service_kdc = 1,
-    locate_service_master_kdc,
-    locate_service_kadmin,
-    locate_service_krb524,
-    locate_service_kpasswd
-};
+#include <krb5/krb5.h>
+#include <krb5/hotfind_plugin.h>
 
 typedef struct krb5plugin_service_locate_ftable {
     int minor_version;          /* currently 0 */

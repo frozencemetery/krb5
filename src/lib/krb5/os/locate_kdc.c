@@ -28,6 +28,8 @@
 #include "fake-addrinfo.h"
 #include "os-proto.h"
 
+#include <krb5/hotfind_plugin.h>
+
 #ifdef KRB5_DNS_LOOKUP
 
 #define DEFAULT_LOOKUP_KDC 1
@@ -37,6 +39,17 @@
 #define DEFAULT_LOOKUP_REALM 0
 #endif
 #define DEFAULT_URI_LOOKUP TRUE
+
+typedef struct hotfind_module_handle {
+    struct krb5_hotfind_vtable_st vt;
+    krb5_hotfind_moddata data;
+} hotfind_module_handle;
+
+/* Data for hotfind_add_server_callback(). */
+typedef struct {
+    struct serverlist *servers;
+    int no_udp;
+} hotfind_callback_data;
 
 static int
 maybe_use_dns (krb5_context context, const char *name, int defalt)
@@ -737,6 +750,174 @@ dns_locate_server_srv(krb5_context context, const krb5_data *realm,
 }
 #endif /* KRB5_DNS_LOOKUP */
 
+
+/* Release a list of hotfind module handles. */
+static void
+free_hotfind_handles(krb5_context context, struct hotfind_module_handle **handles)
+{
+    hotfind_module_handle *h, **hp;
+    
+    if (handles == NULL)
+        return;
+
+    for (hp = handles; *hp != NULL; hp++) {
+        h = *hp;
+        if (h->vt.fini != NULL)
+            h->vt.fini(context, h->data);
+        free(h);
+    }
+    free(handles);
+}
+
+/* Load all hotfind module handles (if they aren't already). */
+static krb5_error_code
+maybe_load_hotfind_handles(krb5_context context)
+{
+    krb5_error_code ret;
+    hotfind_module_handle **handles = NULL, *h;
+    krb5_plugin_initvt_fn *modules = NULL, *m;
+    size_t count;
+
+    if (context->hotfind_handles != NULL)
+        return 0;
+
+    ret = k5_plugin_load_all(context, PLUGIN_INTERFACE_HOTFIND, &modules);
+    if (ret)
+        goto cleanup;
+
+    for (count = 0; modules[count] != NULL; count++);
+    handles = k5calloc(count + 1, sizeof(*modules), &ret);
+    if (handles == NULL)
+        goto cleanup;
+
+    count = 0;
+    for (m = modules; *m != NULL; m++) {
+        h = k5calloc(sizeof(*h), 1, &ret);
+        if (h == NULL)
+            goto cleanup;
+
+        ret = (*m)(context, 2, 1, (krb5_plugin_vtable)&h->vt);
+        if (ret) {
+            TRACE_HOTFIND_VTINIT_FAIL(context, ret);
+            free(h);
+            continue;
+        }
+
+        if (h->vt.init != NULL) {
+            ret = h->vt.init(context, &h->data);
+            if (ret) {
+                TRACE_HOTFIND_INIT_FAIL(context, h->vt.name, ret);
+                free(h);
+                continue;
+            }
+        }
+        handles[count++] = h;
+    }
+    handles[count] = NULL;
+
+    ret = 0;
+    context->hotfind_handles = handles;
+    handles = NULL;
+
+cleanup:
+    k5_plugin_free_modules(context, modules);
+    free_hotfind_handles(context, handles);
+    return ret;
+}
+
+/* Add a server to serverlist.  Passed to hotfind modules as a callback. */
+static void
+hotfind_add_server_callback(void *cbdata, const char *hostname, uint16_t port,
+                            int tcp_only, const char *uri_path, int family,
+                            size_t addrlen, const struct sockaddr *addr)
+{
+    hotfind_callback_data *data = cbdata;
+    struct serverlist *servers = data->servers;
+    int no_udp = data->no_udp;
+    struct server_entry *e;
+    k5_transport transport = TCP_OR_UDP;
+
+    e = new_server_entry(servers);
+    if (e == NULL)
+        return;
+
+    if (e->uri_path != NULL)
+        transport = HTTPS;
+    else if (tcp_only || no_udp)
+        transport = TCP;
+
+    if (hostname != NULL) {
+        e->hostname = strdup(hostname);
+        if (e->hostname == NULL)
+            goto error;
+    }
+    e->port = port;
+    e->transport = transport;
+    if (uri_path != NULL) {
+        e->uri_path = strdup(uri_path);
+        if (e->uri_path == NULL)
+            goto error;
+    }
+    e->family = family;
+    e->addrlen = addrlen;
+    if (addrlen != 0)
+        memcpy(&e->addr, addr, addrlen);
+
+    servers->nservers++;
+    return;
+
+error:
+    free(e->hostname);
+    free(e->uri_path);
+    return;
+}
+
+/* Use hotfind plugins to look up a service. */
+static krb5_error_code
+hotfind_locate_server(krb5_context context, const krb5_data *realm,
+                      struct serverlist *servers,
+                      enum locate_service_type svc, krb5_boolean no_udp)
+{
+    krb5_error_code ret;
+    hotfind_module_handle *h, **hp;
+    hotfind_callback_data cb_data;
+    char *realmstr;
+
+    /* NUL-terminate the realm. */
+    realmstr = strndup(realm->data, realm->length);
+    if (realmstr == NULL)
+        return ENOMEM;
+
+    cb_data.servers = servers;
+    cb_data.no_udp = no_udp;
+
+    ret = maybe_load_hotfind_handles(context);
+    if (ret)
+        return ret;
+
+    for (hp = context->hotfind_handles; hp != NULL && *hp != NULL; hp++) {
+        h = *hp;
+        ret = h->vt.find(context, h->data, svc, realmstr, no_udp,
+                         &hotfind_add_server_callback, &cb_data);
+        if (ret == -1)
+            return 0; /* Stop iteration even though list is empty. */
+        else if (ret != 0 && ret != KRB5_PLUGIN_NO_HANDLE)
+            return ret;
+        else if (servers->nservers > 0)
+            break;
+    }
+
+    return 0;
+}
+
+/* De-initialize and release hotfind plugin handles. */
+void
+k5_hotfind_free_context(krb5_context context)
+{
+    free_hotfind_handles(context, context->hotfind_handles);
+    context->hotfind_handles = NULL;
+}
+
 /*
  * Try all of the server location methods in sequence.  transport must be
  * TCP_OR_UDP, TCP, or UDP.  It is applied to hostname entries in the profile
@@ -752,6 +933,10 @@ locate_server(krb5_context context, const krb5_data *realm,
     struct serverlist list = SERVERLIST_INIT;
 
     *serverlist = list;
+
+    ret = hotfind_locate_server(context, realm, &list, svc, transport);
+    if (ret)
+        goto done;
 
     /* Try modules.  If a module returns 0 but leaves the list empty, return an
      * empty list. */

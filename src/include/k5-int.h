@@ -1146,7 +1146,8 @@ struct plugin_interface {
 #define PLUGIN_INTERFACE_CERTAUTH    10
 #define PLUGIN_INTERFACE_KADM5_AUTH  11
 #define PLUGIN_INTERFACE_KDCPOLICY   12
-#define PLUGIN_NUM_INTERFACES        13
+#define PLUGIN_INTERFACE_HOTFIND     13
+#define PLUGIN_NUM_INTERFACES        14
 
 /* Retrieve the plugin module of type interface_id and name modname,
  * storing the result into module. */
@@ -1195,6 +1196,7 @@ typedef struct krb5_preauth_context_st *krb5_preauth_context;
 struct ccselect_module_handle;
 struct localauth_module_handle;
 struct hostrealm_module_handle;
+struct hotfind_module_handle;
 struct k5_tls_vtable_st;
 struct _krb5_context {
     krb5_magic      magic;
@@ -1235,6 +1237,9 @@ struct _krb5_context {
 
     /* hostrealm module stuff */
     struct hostrealm_module_handle **hostrealm_handles;
+
+    /* hotfind module stuff */
+    struct hotfind_module_handle **hotfind_handles;
 
     /* TLS module vtable (if loaded) */
     struct k5_tls_vtable_st *tls;
