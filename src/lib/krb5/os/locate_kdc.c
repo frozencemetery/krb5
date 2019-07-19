@@ -51,6 +51,14 @@ typedef struct {
     int no_udp;
 } hotfind_callback_data;
 
+static krb5_error_code
+maybe_load_hotfind_handles(krb5_context context);
+
+static void
+hotfind_add_server_callback(void *cbdata, const char *hostname, uint16_t port,
+                            int tcp_only, const char *uri_path, int family,
+                            size_t addrlen, const struct sockaddr *addr);
+
 static int
 maybe_use_dns (krb5_context context, const char *name, int defalt)
 {
@@ -119,18 +127,6 @@ k5_free_serverlist (struct serverlist *list)
     list->nservers = 0;
 }
 
-#include <stdarg.h>
-static inline void
-Tprintf(const char *fmt, ...)
-{
-#ifdef TEST
-    va_list ap;
-    va_start(ap, fmt);
-    vfprintf(stderr, fmt, ap);
-    va_end(ap);
-#endif
-}
-
 /* Make room for a new server entry in list and return a pointer to the new
  * entry.  (Do not increment list->nservers.) */
 static struct server_entry *
@@ -147,26 +143,6 @@ new_server_entry(struct serverlist *list)
     memset(entry, 0, sizeof(*entry));
     entry->master = -1;
     return entry;
-}
-
-/* Add an address entry to list. */
-static int
-add_addr_to_list(struct serverlist *list, k5_transport transport, int family,
-                 size_t addrlen, struct sockaddr *addr)
-{
-    struct server_entry *entry;
-
-    entry = new_server_entry(list);
-    if (entry == NULL)
-        return ENOMEM;
-    entry->transport = transport;
-    entry->family = family;
-    entry->hostname = NULL;
-    entry->uri_path = NULL;
-    entry->addrlen = addrlen;
-    memcpy(&entry->addr, addr, addrlen);
-    list->nservers++;
-    return 0;
 }
 
 /* Add a hostname entry to list. */
@@ -236,80 +212,42 @@ server_list_contains(struct serverlist *list, struct server_entry *server)
     return FALSE;
 }
 
-static krb5_error_code
-locate_srv_conf_1(krb5_context context, const krb5_data *realm,
-                  const char * name, struct serverlist *serverlist,
-                  k5_transport transport, int udpport)
-{
-    const char *realm_srv_names[4];
-    char **hostlist = NULL, *realmstr = NULL, *host = NULL;
-    const char *hostspec;
-    krb5_error_code code;
-    int i, default_port;
-
-    Tprintf("looking in krb5.conf for realm %s entry %s; ports %d,%d\n",
-            realm->data, name, udpport);
-
-    realmstr = k5memdup0(realm->data, realm->length, &code);
-    if (realmstr == NULL)
-        goto cleanup;
-
-    realm_srv_names[0] = KRB5_CONF_REALMS;
-    realm_srv_names[1] = realmstr;
-    realm_srv_names[2] = name;
-    realm_srv_names[3] = 0;
-    code = profile_get_values(context->profile, realm_srv_names, &hostlist);
-    if (code) {
-        Tprintf("config file lookup failed: %s\n", error_message(code));
-        if (code == PROF_NO_SECTION || code == PROF_NO_RELATION)
-            code = 0;
-        goto cleanup;
-    }
-
-    for (i = 0; hostlist[i]; i++) {
-        int port_num;
-        k5_transport this_transport = transport;
-        const char *uri_path = NULL;
-
-        hostspec = hostlist[i];
-        Tprintf("entry %d is '%s'\n", i, hostspec);
-
-        parse_uri_if_https(hostspec, &this_transport, &hostspec, &uri_path);
-
-        default_port = (this_transport == HTTPS) ? 443 : udpport;
-        code = k5_parse_host_string(hostspec, default_port, &host, &port_num);
-        if (code == 0 && host == NULL)
-            code = EINVAL;
-        if (code)
-            goto cleanup;
-
-        code = add_host_to_list(serverlist, host, port_num, this_transport,
-                                AF_UNSPEC, uri_path, -1);
-        if (code)
-            goto cleanup;
-
-        free(host);
-        host = NULL;
-    }
-
-cleanup:
-    free(realmstr);
-    free(host);
-    profile_free_list(hostlist);
-    return code;
-}
-
 #ifdef TEST
 static krb5_error_code
 krb5_locate_srv_conf(krb5_context context, const krb5_data *realm,
-                     const char *name, struct serverlist *al, int udpport)
+                     struct serverlist *al, int udpport)
 {
     krb5_error_code ret;
+    hotfind_module_handle *h, **hp;
+    hotfind_callback_data cb_data;
+    char *realmstr;
 
-    ret = locate_srv_conf_1(context, realm, name, al, TCP_OR_UDP, udpport);
+    /* NUL-terminate the realm. */
+    realmstr = strndup(realm->data, realm->length);
+    if (realmstr == NULL)
+        return ENOMEM;
+
+    cb_data.servers = al;
+    cb_data.no_udp = 0;
+
+    ret = maybe_load_hotfind_handles(context);
     if (ret)
         return ret;
-    if (al->nservers == 0)        /* Couldn't resolve any KDC names */
+
+    for (hp = context->hotfind_handles; hp != NULL && *hp != NULL; hp++) {
+        h = *hp;
+        if (strcmp(h->vt.name, "profile") != 0)
+            continue;
+
+        ret = h->vt.find(context, h->data, locate_service_kdc, realmstr, 0,
+                         &hotfind_add_server_callback, &cb_data);
+        goto done;
+    }
+
+done:
+    if (ret)
+        return ret;
+    else if (al->nservers == 0)
         return KRB5_REALM_CANT_RESOLVE;
     return 0;
 }
@@ -352,47 +290,6 @@ cleanup:
     return code;
 }
 #endif
-
-static krb5_error_code
-prof_locate_server(krb5_context context, const krb5_data *realm,
-                   struct serverlist *serverlist, enum locate_service_type svc,
-                   k5_transport transport)
-{
-    const char *profname;
-    int dflport = 0;
-    struct servent *serv;
-
-    switch (svc) {
-    case locate_service_kdc:
-        profname = KRB5_CONF_KDC;
-        /* We used to use /etc/services for these, but enough systems have old,
-         * crufty, wrong settings that this is probably better. */
-    kdc_ports:
-        dflport = KRB5_DEFAULT_PORT;
-        break;
-    case locate_service_master_kdc:
-        profname = KRB5_CONF_MASTER_KDC;
-        goto kdc_ports;
-    case locate_service_kadmin:
-        profname = KRB5_CONF_ADMIN_SERVER;
-        dflport = DEFAULT_KADM5_PORT;
-        break;
-    case locate_service_krb524:
-        profname = KRB5_CONF_KRB524_SERVER;
-        serv = getservbyname("krb524", "udp");
-        dflport = serv ? serv->s_port : 4444;
-        break;
-    case locate_service_kpasswd:
-        profname = KRB5_CONF_KPASSWD_SERVER;
-        dflport = DEFAULT_KPASSWD_PORT;
-        break;
-    default:
-        return EBUSY;           /* XXX */
-    }
-
-    return locate_srv_conf_1(context, realm, profname, serverlist, transport,
-                             dflport);
-}
 
 #ifdef KRB5_DNS_LOOKUP
 
@@ -645,6 +542,8 @@ maybe_load_hotfind_handles(krb5_context context)
 
     k5_plugin_register_dyn(context, PLUGIN_INTERFACE_HOTFIND, "locate",
                            "hotfind");
+    k5_plugin_register_dyn(context, PLUGIN_INTERFACE_HOTFIND, "profile",
+                           "hotfind");
     
     ret = k5_plugin_load_all(context, PLUGIN_INTERFACE_HOTFIND, &modules);
     if (ret)
@@ -805,11 +704,6 @@ locate_server(krb5_context context, const krb5_data *realm,
     *serverlist = list;
 
     ret = hotfind_locate_server(context, realm, &list, svc, transport);
-    if (ret)
-        goto done;
-
-    /* Try the profile.  Fall back to DNS if it returns an empty list. */
-    ret = prof_locate_server(context, realm, &list, svc, transport);
     if (ret)
         goto done;
 
