@@ -353,144 +353,6 @@ cleanup:
 }
 #endif
 
-#include <krb5/locate_plugin.h>
-
-#if TARGET_OS_MAC
-static const char *objdirs[] = { KRB5_PLUGIN_BUNDLE_DIR,
-                                 LIBDIR "/krb5/plugins/libkrb5",
-                                 NULL }; /* should be a list */
-#else
-static const char *objdirs[] = { LIBDIR "/krb5/plugins/libkrb5", NULL };
-#endif
-
-struct module_callback_data {
-    int out_of_mem;
-    struct serverlist *list;
-};
-
-static int
-module_callback(void *cbdata, int socktype, struct sockaddr *sa)
-{
-    struct module_callback_data *d = cbdata;
-    size_t addrlen;
-    k5_transport transport;
-
-    if (socktype != SOCK_STREAM && socktype != SOCK_DGRAM)
-        return 0;
-    if (sa->sa_family == AF_INET)
-        addrlen = sizeof(struct sockaddr_in);
-    else if (sa->sa_family == AF_INET6)
-        addrlen = sizeof(struct sockaddr_in6);
-    else
-        return 0;
-    transport = (socktype == SOCK_STREAM) ? TCP : UDP;
-    if (add_addr_to_list(d->list, transport, sa->sa_family, addrlen,
-                         sa) != 0) {
-        /* Assumes only error is ENOMEM.  */
-        d->out_of_mem = 1;
-        return 1;
-    }
-    return 0;
-}
-
-static krb5_error_code
-module_locate_server(krb5_context ctx, const krb5_data *realm,
-                     struct serverlist *serverlist,
-                     enum locate_service_type svc, k5_transport transport)
-{
-    struct krb5plugin_service_locate_result *res = NULL;
-    krb5_error_code code;
-    struct krb5plugin_service_locate_ftable *vtbl = NULL;
-    void **ptrs;
-    char *realmz;               /* NUL-terminated realm */
-    int socktype, i;
-    struct module_callback_data cbdata = { 0, };
-    const char *msg;
-
-    Tprintf("in module_locate_server\n");
-    cbdata.list = serverlist;
-    if (!PLUGIN_DIR_OPEN(&ctx->libkrb5_plugins)) {
-
-        code = krb5int_open_plugin_dirs(objdirs, NULL, &ctx->libkrb5_plugins,
-                                        &ctx->err);
-        if (code)
-            return KRB5_PLUGIN_NO_HANDLE;
-    }
-
-    code = krb5int_get_plugin_dir_data(&ctx->libkrb5_plugins,
-                                       "service_locator", &ptrs, &ctx->err);
-    if (code) {
-        Tprintf("error looking up plugin symbols: %s\n",
-                (msg = krb5_get_error_message(ctx, code)));
-        krb5_free_error_message(ctx, msg);
-        return KRB5_PLUGIN_NO_HANDLE;
-    }
-
-    if (realm->length >= UINT_MAX) {
-        krb5int_free_plugin_dir_data(ptrs);
-        return ENOMEM;
-    }
-    realmz = k5memdup0(realm->data, realm->length, &code);
-    if (realmz == NULL) {
-        krb5int_free_plugin_dir_data(ptrs);
-        return code;
-    }
-    for (i = 0; ptrs[i]; i++) {
-        void *blob;
-
-        vtbl = ptrs[i];
-        Tprintf("element %d is %p\n", i, ptrs[i]);
-
-        /* For now, don't keep the plugin data alive.  For long-lived
-         * contexts, it may be desirable to change that later. */
-        code = vtbl->init(ctx, &blob);
-        if (code)
-            continue;
-
-        socktype = (transport == TCP) ? SOCK_STREAM : SOCK_DGRAM;
-        code = vtbl->lookup(blob, svc, realmz, socktype, AF_UNSPEC,
-                            module_callback, &cbdata);
-        /* Also ask for TCP addresses if we got UDP addresses and want both. */
-        if (code == 0 && transport == TCP_OR_UDP) {
-            code = vtbl->lookup(blob, svc, realmz, SOCK_STREAM, AF_UNSPEC,
-                                module_callback, &cbdata);
-            if (code == KRB5_PLUGIN_NO_HANDLE)
-                code = 0;
-        }
-        vtbl->fini(blob);
-        if (code == KRB5_PLUGIN_NO_HANDLE) {
-            /* Module passes, keep going.  */
-            /* XXX */
-            Tprintf("plugin doesn't handle this realm (KRB5_PLUGIN_NO_HANDLE)"
-                    "\n");
-            continue;
-        }
-        if (code != 0) {
-            /* Module encountered an actual error.  */
-            Tprintf("plugin lookup routine returned error %d: %s\n",
-                    code, error_message(code));
-            free(realmz);
-            krb5int_free_plugin_dir_data(ptrs);
-            return code;
-        }
-        break;
-    }
-    if (ptrs[i] == NULL) {
-        Tprintf("ran off end of plugin list\n");
-        free(realmz);
-        krb5int_free_plugin_dir_data(ptrs);
-        return KRB5_PLUGIN_NO_HANDLE;
-    }
-    Tprintf("stopped with plugin #%d, res=%p\n", i, res);
-
-    /* Got something back, yippee.  */
-    Tprintf("now have %lu addrs in list %p\n",
-            (unsigned long)serverlist->nservers, serverlist);
-    free(realmz);
-    krb5int_free_plugin_dir_data(ptrs);
-    return 0;
-}
-
 static krb5_error_code
 prof_locate_server(krb5_context context, const krb5_data *realm,
                    struct serverlist *serverlist, enum locate_service_type svc,
@@ -781,6 +643,9 @@ maybe_load_hotfind_handles(krb5_context context)
     if (context->hotfind_handles != NULL)
         return 0;
 
+    k5_plugin_register_dyn(context, PLUGIN_INTERFACE_HOTFIND, "locate",
+                           "hotfind");
+    
     ret = k5_plugin_load_all(context, PLUGIN_INTERFACE_HOTFIND, &modules);
     if (ret)
         goto cleanup;
@@ -893,21 +758,26 @@ hotfind_locate_server(krb5_context context, const krb5_data *realm,
 
     ret = maybe_load_hotfind_handles(context);
     if (ret)
-        return ret;
+        goto done;
 
     for (hp = context->hotfind_handles; hp != NULL && *hp != NULL; hp++) {
         h = *hp;
         ret = h->vt.find(context, h->data, svc, realmstr, no_udp,
                          &hotfind_add_server_callback, &cb_data);
-        if (ret == -1)
-            return 0; /* Stop iteration even though list is empty. */
-        else if (ret != 0 && ret != KRB5_PLUGIN_NO_HANDLE)
-            return ret;
-        else if (servers->nservers > 0)
+        if (ret == -1) {
+            /* Stop iteration even though list is empty. */
+            ret = 0;
+            goto done;
+        } else if (ret != 0 && ret != KRB5_PLUGIN_NO_HANDLE) {
+            goto done;
+        } else if (servers->nservers > 0) {
             break;
+        }
     }
 
-    return 0;
+done:
+    free(realmstr);
+    return ret;
 }
 
 /* De-initialize and release hotfind plugin handles. */
@@ -936,12 +806,6 @@ locate_server(krb5_context context, const krb5_data *realm,
 
     ret = hotfind_locate_server(context, realm, &list, svc, transport);
     if (ret)
-        goto done;
-
-    /* Try modules.  If a module returns 0 but leaves the list empty, return an
-     * empty list. */
-    ret = module_locate_server(context, realm, &list, svc, transport);
-    if (ret != KRB5_PLUGIN_NO_HANDLE)
         goto done;
 
     /* Try the profile.  Fall back to DNS if it returns an empty list. */

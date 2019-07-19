@@ -1,0 +1,22 @@
+mydir=plugins$(S)hotfind$(S)locate
+BUILDTOP=$(REL)..$(S)..$(S)..
+LOCALINCLUDES=-I$(srcdir)/../../../lib/krb5/os
+DEFINES=-DLIBDIR=\"$(KRB5_LIBDIR)\"
+
+LIBBASE=locate
+LIBMAJOR=0
+LIBMINOR=0
+RELDIR=../plugins/hotfind/locate
+SHLIB_EXPDEPS=$(KRB5_BASE_DEPLIBS)
+SHLIB_EXPLIBS=$(KRB5_BASE_LIBS)
+
+STLIBOBJS=main.o
+
+SRCS=$(srcdir)/main.c
+
+all-unix: all-liblinks
+install-unix: install-libs
+clean-unix:: clean-liblinks clean-libs clean-libobjs
+
+@libnover_frag@
+@libobj_frag@

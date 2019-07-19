@@ -1518,6 +1518,7 @@ V5_AC_OUTPUT_MAKEFILE(.
 	plugins/authdata/greet_client
 	plugins/authdata/greet_server
 	plugins/tls/k5tls
+	plugins/hotfind/locate
 
 	clients clients/klist clients/kinit clients/kvno
 	clients/kdestroy clients/kpasswd clients/ksu clients/kswitch
