@@ -27,6 +27,10 @@
 
 #include "crypto_int.h"
 
+#include <openssl/core_names.h>
+#include <openssl/evp.h>
+#include <openssl/kdf.h>
+
 static krb5_key
 find_cached_dkey(struct derived_key *list, const krb5_data *constant)
 {
@@ -218,41 +222,55 @@ k5_sp800_108_counter_hmac(const struct krb5_hash_provider *hash,
                           krb5_key inkey, krb5_data *outrnd,
                           const krb5_data *label, const krb5_data *context)
 {
-    krb5_crypto_iov iov[5];
-    krb5_error_code ret;
-    krb5_data prf;
-    unsigned char ibuf[4], lbuf[4];
+    krb5_error_code ret = KRB5_CRYPTO_INTERNAL;
+    EVP_KDF *kdf = NULL;
+    EVP_KDF_CTX *kctx = NULL;
+    OSSL_PARAM params[6];
+    size_t i = 0;
+    char *digest;
 
-    if (hash == NULL || outrnd->length > hash->hashsize)
-        return KRB5_CRYPTO_INTERNAL;
+    if (!strcmp(hash->hash_name, "SHA1"))
+        digest = "SHA1";
+    else if (!strcmp(hash->hash_name, "SHA-256"))
+        digest = "SHA256";
+    else if (!strcmp(hash->hash_name, "SHA-384"))
+        digest = "SHA384";
+    else
+        goto done;
 
-    /* Allocate encryption data buffer. */
-    ret = alloc_data(&prf, hash->hashsize);
-    if (ret)
-        return ret;
+    kdf = EVP_KDF_fetch(NULL, "KBKDF", NULL);
+    if (!kdf)
+        goto done;
 
-    /* [i]2: four-byte big-endian binary string giving the block counter (1) */
-    iov[0].flags = KRB5_CRYPTO_TYPE_DATA;
-    iov[0].data = make_data(ibuf, sizeof(ibuf));
-    store_32_be(1, ibuf);
-    /* Label */
-    iov[1].flags = KRB5_CRYPTO_TYPE_DATA;
-    iov[1].data = *label;
-    /* 0x00: separator byte */
-    iov[2].flags = KRB5_CRYPTO_TYPE_DATA;
-    iov[2].data = make_data("", 1);
-    /* Context */
-    iov[3].flags = KRB5_CRYPTO_TYPE_DATA;
-    iov[3].data = *context;
-    /* [L]2: four-byte big-endian binary string giving the output length */
-    iov[4].flags = KRB5_CRYPTO_TYPE_DATA;
-    iov[4].data = make_data(lbuf, sizeof(lbuf));
-    store_32_be(outrnd->length * 8, lbuf);
+    kctx = EVP_KDF_CTX_new(kdf);
+    if (!kctx)
+        goto done;
 
-    ret = krb5int_hmac(hash, inkey, iov, 5, &prf);
-    if (!ret)
-        memcpy(outrnd->data, prf.data, outrnd->length);
-    zapfree(prf.data, prf.length);
+    params[i++] = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST,
+                                                   digest, 0);
+    params[i++] = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_MAC,
+                                                   "HMAC", 0);
+    params[i++] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY,
+                                                    inkey->keyblock.contents,
+                                                    inkey->keyblock.length);
+    params[i++] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO,
+                                                    context->data,
+                                                    context->length);
+    params[i++] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT,
+                                                    label->data,
+                                                    label->length);
+    params[i] = OSSL_PARAM_construct_end();
+    if (EVP_KDF_CTX_set_params(kctx, params) <= 0) {
+        goto done;
+    } else if (EVP_KDF_derive(kctx, (unsigned char *)outrnd->data,
+                              outrnd->length) <= 0) {
+        goto done;
+    }
+
+    ret = 0;
+done:
+    EVP_KDF_free(kdf);
+    EVP_KDF_CTX_free(kctx);
     return ret;
 }
 
