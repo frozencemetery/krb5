@@ -27,6 +27,10 @@
 
 #include "crypto_int.h"
 
+#include <openssl/core_names.h>
+#include <openssl/evp.h>
+#include <openssl/kdf.h>
+
 static krb5_key
 find_cached_dkey(struct derived_key *list, const krb5_data *constant)
 {
@@ -82,50 +86,57 @@ derive_random_rfc3961(const struct krb5_enc_provider *enc,
                       krb5_key inkey, krb5_data *outrnd,
                       const krb5_data *in_constant)
 {
-    size_t blocksize, keybytes, n;
-    krb5_error_code ret;
-    krb5_data block = empty_data();
+    krb5_error_code ret = KRB5_CRYPTO_INTERNAL;
+    EVP_KDF *kdf = NULL;
+    EVP_KDF_CTX *kctx = NULL;
+    OSSL_PARAM params[4];
+    size_t i = 0;
+    char *cipher;
 
-    blocksize = enc->block_size;
-    keybytes = enc->keybytes;
-
-    if (blocksize == 1)
-        return KRB5_BAD_ENCTYPE;
-    if (inkey->keyblock.length != enc->keylength || outrnd->length != keybytes)
+    if (inkey->keyblock.length != enc->keylength ||
+        outrnd->length != enc->keybytes) {
         return KRB5_CRYPTO_INTERNAL;
+    }
 
-    /* Allocate encryption data buffer. */
-    ret = alloc_data(&block, blocksize);
+    if (enc->encrypt == krb5int_aes_encrypt && enc->keylength == 16)
+        cipher = "AES-128-CBC";
+    else if (enc->encrypt == krb5int_aes_encrypt && enc->keylength == 32)
+        cipher = "AES-256-CBC";
+    else if (enc->keylength == 24)
+        cipher = "DES-EDE3-CBC";
+    else
+        goto done;
+
+    kdf = EVP_KDF_fetch(NULL, "KRB5KDF", NULL);
+    if (kdf == NULL)
+        goto done;
+
+    kctx = EVP_KDF_CTX_new(kdf);
+    if (kctx == NULL)
+        goto done;
+
+    params[i++] = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_CIPHER,
+                                                   cipher, 0);
+    params[i++] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY,
+                                                    inkey->keyblock.contents,
+                                                    inkey->keyblock.length);
+    params[i++] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_CONSTANT,
+                                                    in_constant->data,
+                                                    in_constant->length);
+    params[i] = OSSL_PARAM_construct_end();
+    if (EVP_KDF_CTX_set_params(kctx, params) <= 0) {
+        goto done;
+    } else if (EVP_KDF_derive(kctx, (unsigned char *)outrnd->data,
+                            outrnd->length) <= 0) {
+        goto done;
+    }
+
+    ret = 0;
+done:
     if (ret)
-        return ret;
-
-    /* Initialize the input block. */
-    if (in_constant->length == blocksize) {
-        memcpy(block.data, in_constant->data, blocksize);
-    } else {
-        krb5int_nfold(in_constant->length * 8,
-                      (unsigned char *) in_constant->data,
-                      blocksize * 8, (unsigned char *) block.data);
-    }
-
-    /* Loop encrypting the blocks until enough key bytes are generated. */
-    n = 0;
-    while (n < keybytes) {
-        ret = encrypt_block(enc, inkey, &block);
-        if (ret)
-            goto cleanup;
-
-        if ((keybytes - n) <= blocksize) {
-            memcpy(outrnd->data + n, block.data, (keybytes - n));
-            break;
-        }
-
-        memcpy(outrnd->data + n, block.data, blocksize);
-        n += blocksize;
-    }
-
-cleanup:
-    zapfree(block.data, blocksize);
+        zap(outrnd->data, outrnd->length);
+    EVP_KDF_free(kdf);
+    EVP_KDF_CTX_free(kctx);
     return ret;
 }
 
