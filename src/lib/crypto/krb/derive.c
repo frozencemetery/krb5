@@ -147,64 +147,57 @@ derive_random_sp800_108_feedback_cmac(const struct krb5_enc_provider *enc,
                                       krb5_key inkey, krb5_data *outrnd,
                                       const krb5_data *in_constant)
 {
-    size_t blocksize, keybytes, n;
-    krb5_crypto_iov iov[6];
-    krb5_error_code ret;
-    krb5_data prf;
-    unsigned int i;
-    unsigned char ibuf[4], Lbuf[4];
+    krb5_error_code ret = KRB5_CRYPTO_INTERNAL;
+    EVP_KDF *kdf = NULL;
+    EVP_KDF_CTX *kctx = NULL;
+    OSSL_PARAM params[7];
+    size_t i = 0;
+    char *cipher;
+    static unsigned char zeroes[16];
 
-    blocksize = enc->block_size;
-    keybytes = enc->keybytes;
+    memset(zeroes, 0, sizeof(zeroes));
 
-    if (inkey->keyblock.length != enc->keylength || outrnd->length != keybytes)
-        return KRB5_CRYPTO_INTERNAL;
+    if (enc->keylength == 16)
+        cipher = "CAMELLIA-128-CBC";
+    else if (enc->keylength == 32)
+        cipher = "CAMELLIA-256-CBC";
+    else
+        goto done;
 
-    /* Allocate encryption data buffer. */
-    ret = alloc_data(&prf, blocksize);
-    if (ret)
-        return ret;
+    kdf = EVP_KDF_fetch(NULL, "KBKDF", NULL);
+    if (!kdf)
+        goto done;
 
-    /* K(i-1): the previous block of PRF output, initially all-zeros. */
-    iov[0].flags = KRB5_CRYPTO_TYPE_DATA;
-    iov[0].data = prf;
-    /* [i]2: four-byte big-endian binary string giving the block counter */
-    iov[1].flags = KRB5_CRYPTO_TYPE_DATA;
-    iov[1].data = make_data(ibuf, sizeof(ibuf));
-    /* Label: the fixed derived-key input */
-    iov[2].flags = KRB5_CRYPTO_TYPE_DATA;
-    iov[2].data = *in_constant;
-    /* 0x00: separator byte */
-    iov[3].flags = KRB5_CRYPTO_TYPE_DATA;
-    iov[3].data = make_data("", 1);
-    /* Context: (unused) */
-    iov[4].flags = KRB5_CRYPTO_TYPE_DATA;
-    iov[4].data = empty_data();
-    /* [L]2: four-byte big-endian binary string giving the output length */
-    iov[5].flags = KRB5_CRYPTO_TYPE_DATA;
-    iov[5].data = make_data(Lbuf, sizeof(Lbuf));
-    store_32_be(outrnd->length * 8, Lbuf);
+    kctx = EVP_KDF_CTX_new(kdf);
+    if (!kctx)
+        goto done;
 
-    for (i = 1, n = 0; n < keybytes; i++) {
-        /* Update the block counter. */
-        store_32_be(i, ibuf);
-
-        /* Compute a CMAC checksum, storing the result into K(i-1). */
-        ret = krb5int_cmac_checksum(enc, inkey, iov, 6, &prf);
-        if (ret)
-            goto cleanup;
-
-        /* Copy the result into the appropriate part of the output buffer. */
-        if (keybytes - n <= blocksize) {
-            memcpy(outrnd->data + n, prf.data, keybytes - n);
-            break;
-        }
-        memcpy(outrnd->data + n, prf.data, blocksize);
-        n += blocksize;
+    params[i++] = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_MODE,
+                                                   "FEEDBACK", 0);
+    params[i++] = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_MAC,
+                                                   "CMAC", 0);
+    params[i++] = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_CIPHER,
+                                                   cipher, 0);
+    params[i++] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY,
+                                                    inkey->keyblock.contents,
+                                                    inkey->keyblock.length);
+    params[i++] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT,
+                                                    in_constant->data,
+                                                    in_constant->length);
+    params[i++] = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SEED,
+                                                    zeroes, sizeof(zeroes));
+    params[i] = OSSL_PARAM_construct_end();
+    if (EVP_KDF_CTX_set_params(kctx, params) <= 0) {
+        goto done;
+    } else if (EVP_KDF_derive(kctx, (unsigned char *)outrnd->data,
+                              outrnd->length) <= 0) {
+        goto done;
     }
 
-cleanup:
-    zapfree(prf.data, blocksize);
+    ret = 0;
+done:
+    EVP_KDF_free(kdf);
+    EVP_KDF_CTX_free(kctx);
     return ret;
 }
 
