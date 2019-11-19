@@ -348,6 +348,7 @@ cleanup:
     zapfree(prf.data, blocksize);
     return ret;
 }
+#endif /* OSSL_KDFS */
 
 static krb5_error_code
 builtin_derive_random_rfc3961(const struct krb5_enc_provider *enc,
@@ -400,7 +401,6 @@ cleanup:
     zapfree(block.data, blocksize);
     return ret;
 }
-#endif /* OSSL_KDFS */
 
 krb5_error_code
 k5_sp800_108_counter_hmac(const struct krb5_hash_provider *hash,
@@ -432,6 +432,10 @@ k5_derive_random_rfc3961(const struct krb5_enc_provider *enc,
                          krb5_key inkey, krb5_data *outrnd,
                          const krb5_data *in_constant)
 {
+    /* DES (single and triple).  They'll be gone very soon. */
+    if (enc->keylength == 8 || enc->keylength == 24)
+        return builtin_derive_random_rfc3961(enc, inkey, outrnd, in_constant);
+
 #ifdef OSSL_KDFS
     return openssl_krb5kdf(enc, inkey, outrnd, in_constant);
 #else
