@@ -35,6 +35,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 \fBkvno\fP
 [\fB\-c\fP \fIccache\fP]
 [\fB\-e\fP \fIetype\fP]
+[\fB\-k\fP \fIkeytab\fP]
 [\fB\-q\fP]
 [\fB\-u\fP | \fB\-S\fP \fIsname\fP]
 [\fB\-P\fP]

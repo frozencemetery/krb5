@@ -9,6 +9,7 @@ SYNOPSIS
 **kvno**
 [**-c** *ccache*]
 [**-e** *etype*]
+[**-k** *keytab*]
 [**-q**]
 [**-u** | **-S** *sname*]
 [**-P**]
