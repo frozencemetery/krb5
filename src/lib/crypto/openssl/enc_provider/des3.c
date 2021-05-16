@@ -84,6 +84,10 @@ k5_des3_encrypt(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
     EVP_CIPHER_CTX *ctx;
     krb5_boolean empty;
 
+    ret = krb5int_crypto_init();
+    if (ret)
+        return ret;
+
     ret = validate(key, ivec, data, num_data, &empty);
     if (ret != 0 || empty)
         return ret;
@@ -132,6 +136,10 @@ k5_des3_decrypt(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
     struct iov_cursor cursor;
     EVP_CIPHER_CTX *ctx;
     krb5_boolean empty;
+
+    ret = krb5int_crypto_init();
+    if (ret)
+        return ret;
 
     ret = validate(key, ivec, data, num_data, &empty);
     if (ret != 0 || empty)
