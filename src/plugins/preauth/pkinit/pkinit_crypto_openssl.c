@@ -44,6 +44,14 @@
 #include <openssl/params.h>
 #endif
 
+#ifdef HAVE_OSSL_PROVIDER_LOAD
+#include <openssl/provider.h>
+
+/* TODO these leak - where to release them? */
+OSSL_PROVIDER *legacy_provider = NULL;
+OSSL_PROVIDER *default_provider = NULL;
+#endif
+
 static krb5_error_code pkinit_init_pkinit_oids(pkinit_plg_crypto_context );
 static void pkinit_fini_pkinit_oids(pkinit_plg_crypto_context );
 
@@ -2937,12 +2945,23 @@ cleanup:
     return retval;
 }
 
+/* Initialize OpenSSL. */
 int
 pkinit_openssl_init()
 {
-    /* Initialize OpenSSL. */
-    ERR_load_crypto_strings();
-    OpenSSL_add_all_algorithms();
+#ifdef HAVE_OSSL_PROVIDER_LOAD
+    legacy_provider = OSSL_PROVIDER_load(NULL, "legacy");
+    default_provider = OSSL_PROVIDER_load(NULL, "default");
+
+    /*
+     * Someone might build openssl without the legacy provider.  They will
+     * have a bad time, but some things will still work.  I don't know think
+     * this configuration is worth supporting.
+     */
+    if (legacy_provider == NULL || default_provider == NULL)
+        abort();
+#endif
+
     return 0;
 }
 

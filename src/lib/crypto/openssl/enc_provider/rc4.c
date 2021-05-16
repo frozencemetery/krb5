@@ -69,6 +69,10 @@ k5_arcfour_docrypt(krb5_key key, const krb5_data *state, krb5_crypto_iov *data,
     if (FIPS_mode())
         return KRB5_CRYPTO_INTERNAL;
 
+    ret = krb5int_crypto_init();
+    if (ret)
+        return ret;
+
     arcstate = (state != NULL) ? (void *)state->data : NULL;
     if (arcstate != NULL) {
         ctx = arcstate->ctx;
