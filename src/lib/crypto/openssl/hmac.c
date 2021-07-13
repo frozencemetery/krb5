@@ -94,64 +94,79 @@ compat_hmac_ctx_free(HMAC_CTX *ctx)
  * and text is the data being protected
  */
 
-static const EVP_MD *
-map_digest(const struct krb5_hash_provider *hash)
-{
-    if (!strncmp(hash->hash_name, "SHA1",4))
-        return EVP_sha1();
-    else if (!strncmp(hash->hash_name, "SHA-256",7))
-        return EVP_sha256();
-    else if (!strncmp(hash->hash_name, "SHA-384",7))
-        return EVP_sha384();
-    else if (!strncmp(hash->hash_name, "MD5", 3))
-        return EVP_md5();
-    else if (!strncmp(hash->hash_name, "MD4", 3))
-        return EVP_md4();
-    else
-        return NULL;
-}
-
 krb5_error_code
 krb5int_hmac_keyblock(const struct krb5_hash_provider *hash,
                       const krb5_keyblock *keyblock,
                       const krb5_crypto_iov *data, size_t num_data,
                       krb5_data *output)
 {
-    unsigned int i = 0, md_len = 0, ok;
-    unsigned char md[EVP_MAX_MD_SIZE];
-    HMAC_CTX *ctx;
-    size_t hashsize, blocksize;
+    int ok;
+    EVP_MAC *mac = NULL;
+    EVP_MAC_CTX *ctx = NULL;
+    OSSL_PARAM params[2];
+    size_t i = 0, md_len;
+    char *digest;
 
-    hashsize = hash->hashsize;
-    blocksize = hash->blocksize;
+    if (keyblock->length > hash->blocksize)
+        return KRB5_CRYPTO_INTERNAL;
+    if (output->length < hash->hashsize)
+        return KRB5_BAD_MSIZE;
 
-    if (keyblock->length > blocksize)
-        return(KRB5_CRYPTO_INTERNAL);
-    if (output->length < hashsize)
-        return(KRB5_BAD_MSIZE);
+    /* OpenSSL does not share our taxonomy, and also requires the digest
+     * string to be non-const. */
+    if (!strncmp(hash->hash_name, "SHA1", 4))
+        digest = "SHA1";
+    else if (!strncmp(hash->hash_name, "SHA-256", 7))
+        digest = "SHA256";
+    else if (!strncmp(hash->hash_name, "SHA-384", 7))
+        digest = "SHA384";
+    else if (!strncmp(hash->hash_name, "MD5", 3))
+        digest = "MD5";
+    else if (!strncmp(hash->hash_name, "MD4", 3))
+        digest = "MD4";
+    else
+        return KRB5_CRYPTO_INTERNAL;
 
-    if (!map_digest(hash))
-        return(KRB5_CRYPTO_INTERNAL); // unsupported alg
+    mac = EVP_MAC_fetch(NULL, "HMAC", NULL);
+    if (mac == NULL)
+        return KRB5_CRYPTO_INTERNAL;
 
-    ctx = HMAC_CTX_new();
-    if (ctx == NULL)
-        return ENOMEM;
+    ctx = EVP_MAC_CTX_new(mac);
+    if (ctx == NULL) {
+        ok = 0;
+        goto cleanup;
+    }
 
-    ok = HMAC_Init_ex(ctx, keyblock->contents, keyblock->length,
-                      map_digest(hash), NULL);
-    for (i = 0; ok && i < num_data; i++) {
+    params[i++] = OSSL_PARAM_construct_utf8_string("digest", digest, 0);
+    params[i] = OSSL_PARAM_construct_end();
+
+    ok = EVP_MAC_init(ctx, keyblock->contents, keyblock->length, params);
+    if (!ok)
+        goto cleanup;
+
+    for (i = 0; i < num_data; i++) {
         const krb5_crypto_iov *iov = &data[i];
+        if (!SIGN_IOV(iov))
+            continue;
 
-        if (SIGN_IOV(iov))
-            ok = HMAC_Update(ctx, (uint8_t *)iov->data.data, iov->data.length);
+        ok = EVP_MAC_update(ctx, (uint8_t *)iov->data.data, iov->data.length);
+        if (!ok)
+            goto cleanup;
     }
-    if (ok)
-        ok = HMAC_Final(ctx, md, &md_len);
-    if (ok && md_len <= output->length) {
-        output->length = md_len;
-        memcpy(output->data, md, output->length);
-    }
-    HMAC_CTX_free(ctx);
+    ok = EVP_MAC_final(ctx, NULL, &md_len, 0);
+    if (!ok)
+        goto cleanup;
+
+    /* OpenSSL handles length checking for us. */
+    ok = EVP_MAC_final(ctx, (unsigned char *)output->data, &md_len,
+                       output->length);
+    if (!ok)
+        goto cleanup;
+    output->length = md_len;
+
+cleanup:
+    EVP_MAC_free(mac);
+    EVP_MAC_CTX_free(ctx);
     return ok ? 0 : KRB5_CRYPTO_INTERNAL;
 }
 
