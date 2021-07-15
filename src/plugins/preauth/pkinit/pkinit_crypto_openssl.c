@@ -1260,7 +1260,7 @@ cms_signeddata_create(krb5_context context,
             goto cleanup;
         EVP_DigestInit_ex(ctx, EVP_sha1(), NULL);
         EVP_DigestUpdate(ctx, data, data_len);
-        md_tmp = EVP_MD_CTX_md(ctx);
+        md_tmp = EVP_MD_CTX_get0_md(ctx);
         EVP_DigestFinal_ex(ctx, md_data, &md_len);
         EVP_MD_CTX_free(ctx);
 
@@ -2245,22 +2245,38 @@ pkinit_octetstring2key(krb5_context context,
     unsigned char counter;
     size_t keybytes, keylength, offset;
     krb5_data random_data;
+    EVP_MD *sha1_md = NULL;
+    EVP_MD_CTX *sha1_ctx = NULL;
+    int ok;
 
-    if ((buf = malloc(dh_key_len)) == NULL) {
+    buf = calloc(1, dh_key_len);
+    if (buf == NULL) {
         retval = ENOMEM;
         goto cleanup;
     }
-    memset(buf, 0, dh_key_len);
+
+    sha1_md = EVP_MD_fetch(NULL, "SHA1", NULL);
+    sha1_ctx = EVP_MD_CTX_new();
+    if (sha1_md == NULL || sha1_ctx == NULL) {
+        retval = KRB5_CRYPTO_INTERNAL;
+        goto cleanup;
+    }
+
+    ok = EVP_DigestInit(sha1_ctx, sha1_md);
+    if (!ok) {
+        retval = KRB5_CRYPTO_INTERNAL;
+        goto cleanup;
+    }
 
     counter = 0;
     offset = 0;
     do {
-        SHA_CTX c;
-
-        SHA1_Init(&c);
-        SHA1_Update(&c, &counter, 1);
-        SHA1_Update(&c, key, dh_key_len);
-        SHA1_Final(md, &c);
+        if (!EVP_DigestUpdate(sha1_ctx, &counter, 1) ||
+            !EVP_DigestUpdate(sha1_ctx, key, dh_key_len) ||
+            !EVP_DigestFinal(sha1_ctx, md, NULL)) {
+            retval = KRB5_CRYPTO_INTERNAL;
+            goto cleanup;
+        }
 
         if (dh_key_len - offset < sizeof(md))
             memcpy(buf + offset, md, dh_key_len - offset);
@@ -2291,11 +2307,13 @@ pkinit_octetstring2key(krb5_context context,
     retval = krb5_c_random_to_key(context, etype, &random_data, key_block);
 
 cleanup:
+    EVP_MD_CTX_free(sha1_ctx);
+    EVP_MD_free(sha1_md);
     free(buf);
+
     /* If this is an error return, free the allocated keyblock, if any */
-    if (retval) {
+    if (retval)
         krb5_free_keyblock_contents(context, key_block);
-    }
 
     return retval;
 }
@@ -3971,8 +3989,10 @@ pkinit_decode_data_fs(krb5_context context,
     X509 *cert = sk_X509_value(id_cryptoctx->my_certs,
                                id_cryptoctx->cert_index);
     EVP_PKEY *pkey = id_cryptoctx->my_key;
-    uint8_t *buf;
-    int buf_len, decrypt_len;
+    EVP_PKEY_CTX *ctx = NULL;
+    uint8_t *buf = NULL;
+    size_t buf_len = 0;
+    int ok;
 
     *decoded_data = NULL;
     *decoded_data_len = 0;
@@ -3982,21 +4002,40 @@ pkinit_decode_data_fs(krb5_context context,
         return KRB5KDC_ERR_PREAUTH_FAILED;
     }
 
-    buf_len = EVP_PKEY_size(pkey);
-    buf = malloc(buf_len + 10);
-    if (buf == NULL)
+    ctx = EVP_PKEY_CTX_new_from_pkey(NULL, pkey, NULL);
+    if (ctx == NULL)
         return KRB5KDC_ERR_PREAUTH_FAILED;
 
-    decrypt_len = EVP_PKEY_decrypt_old(buf, data, data_len, pkey);
-    if (decrypt_len <= 0) {
-        pkiDebug("unable to decrypt received data (len=%d)\n", data_len);
-        free(buf);
-        return KRB5KDC_ERR_PREAUTH_FAILED;
+    ok = EVP_PKEY_decrypt_init(ctx);
+    if (!ok)
+        goto cleanup;
+
+    /* Get the length of the eventual output. */
+    ok = EVP_PKEY_decrypt(ctx, NULL, &buf_len, data, data_len);
+    if (!ok) {
+        pkiDebug("unable to decrypt received data\n");
+        goto cleanup;
+    }
+
+    buf = malloc(buf_len);
+    if (buf == NULL) {
+        ok = 0;
+        goto cleanup;
+    }
+
+    ok = EVP_PKEY_decrypt(ctx, buf, &buf_len, data, data_len);
+    if (!ok) {
+        pkiDebug("unable to decrypt received data\n");
+        goto cleanup;
     }
 
     *decoded_data = buf;
-    *decoded_data_len = decrypt_len;
-    return 0;
+    *decoded_data_len = buf_len;
+    buf = NULL;
+cleanup:
+    zapfree(buf, buf_len);
+    EVP_PKEY_CTX_free(ctx);
+    return ok ? 0 : KRB5KDC_ERR_PREAUTH_FAILED;
 }
 
 #ifndef WITHOUT_PKCS11
